@@ -24,7 +24,7 @@ const studentSchema = new mongoose.Schema({
     required: true,
   },
   faceDescriptor: {
-    type: Object, // we will store face-api.js descriptor (JSON)
+    type: String, // encrypted
     required: true,
   },
   hasVoted: {
@@ -35,6 +35,9 @@ const studentSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+   votingToken: 
+   { type: String, 
+    default: null },
 });
 
 module.exports = mongoose.model("Student", studentSchema);
