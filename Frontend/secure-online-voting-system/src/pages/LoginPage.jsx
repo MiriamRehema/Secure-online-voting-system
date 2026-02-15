@@ -57,7 +57,7 @@ const LoginPage = ({ userType, onLoginSuccess, onBack }) => {
             <div className="container">
                 <header className="header">
                     <div className="logo-container">
-                        <div className="jkuat-logo">JK</div>
+                        <img src={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logo-img"/>
 
                     </div>
                     <h1>JKUAT Voting System</h1>

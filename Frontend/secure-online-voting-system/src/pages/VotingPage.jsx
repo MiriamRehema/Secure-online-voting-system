@@ -94,7 +94,7 @@ const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResul
             <div className="container">
                 <header className="header">
                     <div className="logo-container">
-                        <div className="jkuat-logo">JK</div>
+                        <img scr={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logo-img"/>
 
                     </div>
                     <h1>JKUAT Secure Voting System</h1>

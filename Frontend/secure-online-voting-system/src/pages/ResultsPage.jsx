@@ -41,7 +41,7 @@ const ResultsPage = ({ onBack, onLogout }) => {
             <div className="container">
                 <header className="header">
                     <div className="logo-container">
-                        <div className="jkuat-logo">JK</div>
+                        <img src={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logi-img"/>
                     </div>
                     <h1>JKUAT Secure Voting System</h1>
                     <p className="subtitle">Election Results</p>

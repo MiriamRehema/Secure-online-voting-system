@@ -8,7 +8,7 @@ const HomePage = ({ onSelectUserType }) => {
             <div className='container'>
                 <header>
                     <div className="logo-container">
-                        <div className="jkuat-logo">JK</div>
+                        <img src={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logo-img"/>
                     </div>
                     <h1>JKUAT Secure Voting System</h1>
                     <p className="subtitle">Face Recognition-Based Authentication | JKUSA Elections</p>

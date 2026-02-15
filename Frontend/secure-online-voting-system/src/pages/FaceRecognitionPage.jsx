@@ -45,7 +45,10 @@ const FaceRecognitionPage = ({ user, onVerificationSuccess, onVerificationFailed
     };
 
     const captureFaceImage = () => {
-        if (!videoRef.current || !canvasRef.current) return null;
+        if (!videoRef.current || !canvasRef.current){
+            console.error('Video or canvas ref not available');
+            return null;
+        }
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
@@ -55,14 +58,22 @@ const FaceRecognitionPage = ({ user, onVerificationSuccess, onVerificationFailed
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+        console.log('Image captured:', canvas.width, 'x', canvas.height);
+
         return new Promise((resolve) => {
-            canvas.toBlob(resolve, 'image/jpeg', 0.95);
+            canvas.toBlob((blob) =>{
+                console.log('Blob created:', blob ? 'Success' : 'Failed');
+                resolve(blob);
+            }, 'image/jpeg', 0.95);
         });
     };
 
-    const handleCaptureAndVerify = async () => {
+const handleCaptureAndVerify = async () => {
+        console.log('Starting face capture and verification...');
+
         if (!cameraReady) {
-            setError('Camera not ready');
+            console.warn('Camera not ready yet')
+            setError('Camera not ready. Please wait...');
             return;
         }
 
@@ -70,14 +81,19 @@ const FaceRecognitionPage = ({ user, onVerificationSuccess, onVerificationFailed
         setError('');
 
         try {
+            console.log('Step 1: Capturing image from video...');
             const imageBlob = await captureFaceImage();
+
             if (!imageBlob) {
-                setError('Failed to capture image');
+                console.error('Failed to capture image blob')
+                setError('Failed to capture image. Please try again');
                 return;
             }
 
+            console.log('Image blob captured:', imageBlob.size, 'bytes');
             setFaceStatus('Verifying...');
-
+            
+            console.log('Step 2: Attempting to send to backend...')
             const formData = new FormData();
             formData.append('face_image', imageBlob, 'face.jpg');
             formData.append('student_id', user.student_id);
@@ -88,38 +104,74 @@ const FaceRecognitionPage = ({ user, onVerificationSuccess, onVerificationFailed
             });
 
             const data = await response.json();
+            console.log('Backend response:', data);
 
             if (response.ok && data.verified) {
-                setFaceStatus('Face Verified');
+                console.log('Backend verification SUCCESS');
+                setFaceStatus('Face Verified successfully!');
                 setTimeout(() => {
                     cleanUpCamera();
                     onVerificationSuccess(data.token);
                 }, 1500);
             } else {
+                console.log('Backend verification FAILED');
                 handleFailedAttempt();
+                return;
             }
-        } catch (networkError) {
-            console.error('Verification error:', networkError);
+        } catch (backendError) {
+            
+            console.warn('Backend not available, using DEMO MODE:', backendError.message);
 
-            const demoSuccess = Math.random() > 0.2 || attemptCount >= 2;
-
-            if (demoSuccess) {
-                setFaceStatus('Face Verified (Demo)');
-                setTimeout(() => {
-                    cleanUpCamera();
-                    onVerificationSuccess('DEMO-TOKEN-' + Date.now());
-                }, 1500);
-            } else {
-                handleFailedAttempt();
+            console.log('DEMO MODE: Simulating face verification...');
+            try {
+                await simulateDemoVerification();
+            } catch (error) {
+                
+                console.error('Capture error:', error);
+                setError('An error has occurred. Please try again.');
+                setFaceStatus('Error occurred');
             }
         }
     };
+   const simulateDemoVerification = async () => {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    const demoSuccess = Math.random() > 0.2 || attemptCount >= 2;
+    console.log(`Demo verification result: ${demoSuccess ? 'SUCCESS' : 'FAIL'} ('attempt ${attemptCount + 1})`);
+
+    if (demoSuccess) {
+        console.log('DEMO: Face Verified successfully!');
+        setFaceStatus('Face verified successfully! (Demo Mode)')
+        const demoToken = 'DEMO-TOKEN-' + Date.now();
+        console.log('Generate token:', demoToken);
+
+        console.log('Cleaning up camera...');
+        cleanUpCamera();
+
+        setTimeout(() => {
+            console.log('Now calling onVerificationSuccess with token:', demoToken);
+            console.log('Callback function exists?', typeof onVerificationSuccess);
+            
+            if (typeof onVerificationSuccess === 'function') {
+                onVerificationSuccess(demoToken);
+                console.log('Successfully called onVerificationSuccess!');
+            } else {
+                console.error('onVerificationSuccess is not a function!');
+            }
+        }, 1500);
+    } else {
+        console.log('DEMO: Face verification failed');
+        handleFailedAttempt();
+    }
+   };
+
 
     const handleFailedAttempt = () => {
         const newCount = attemptCount + 1;
         setAttemptCount(newCount);
-        setFaceStatus('Face Not Recognized');
-        setError(`Attempt ${newCount} of 3 failed`);
+        setFaceStatus('Face verification failed');
+        setError(`Verification failed. Attempt ${newCount} of 3`);
+
+        console.log(`Failed attempt ${newCount} of 3`);
 
         if (newCount < 3) {
             setTimeout(() => {
@@ -127,7 +179,8 @@ const FaceRecognitionPage = ({ user, onVerificationSuccess, onVerificationFailed
                 setError('');
             }, 2000);
         } else {
-            setError('Maximum attempts reached. Please try again later.');
+            console.log('Maximum attempts reached. Starting 60s timer...')
+            setError('Maximum attempts reached. Returning to home in 60 seconds...');
             start60SecondTimer();
         }
     };
@@ -139,9 +192,11 @@ const FaceRecognitionPage = ({ user, onVerificationSuccess, onVerificationFailed
         const interval = setInterval(() => {
             timeLeft--;
             setRetryTimer(timeLeft);
+            console.log(`Timer: ${timeLeft}s remaining`)
 
             if (timeLeft <= 0) {
                 clearInterval(interval);
+                console.log('Timer expired. Returning to home...')
                 cleanUpCamera();
                 onVerificationFailed();
             }
@@ -155,7 +210,7 @@ const FaceRecognitionPage = ({ user, onVerificationSuccess, onVerificationFailed
             <div className="container">
                 <header className="header">
                     <div className="logo-container">
-                        <div className="jkuat-logo">JK</div>
+                        <img src={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logo-img"/>
                     </div>
                     <h1>JKUAT Secure Voting System</h1>
                     <p className="subtitle">Face Recognition Authentication</p>
@@ -194,7 +249,7 @@ const FaceRecognitionPage = ({ user, onVerificationSuccess, onVerificationFailed
 
                             {retryTimer !== null && (
                                 <div className="retry-timer">
-                                    Retry in {retryTimer} seconds...
+                                    Returning home in {retryTimer}s...
                                 </div>
                             )}
                         </div>
@@ -204,7 +259,7 @@ const FaceRecognitionPage = ({ user, onVerificationSuccess, onVerificationFailed
                             onClick={handleCaptureAndVerify}
                             disabled={!cameraReady || retryTimer !== null}
                         >
-                            Capture & Verify Face
+                            {cameraReady ? 'Capture & Verify Face': 'Initialize Camera...'}
                         </button>
 
                         <button className="btn btn-danger" onClick={() => {
@@ -218,6 +273,6 @@ const FaceRecognitionPage = ({ user, onVerificationSuccess, onVerificationFailed
             </div>
         </div>
     )
-};
+}
 
 export default FaceRecognitionPage;
