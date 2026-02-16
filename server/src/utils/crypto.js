@@ -1,20 +1,35 @@
 const crypto = require("crypto");
 
 const ALGORITHM = "aes-256-gcm";
-const KEY = Buffer.from(process.env.ENCRYPTION_KEY, "utf8"); // 32 bytes
-const IV = Buffer.alloc(16, 0); // initialization vector
+const KEY = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
+const IV_LENGTH = 12; // Recommended for GCM
 
 function encryptDescriptor(descriptor) {
-  const cipher = crypto.createCipheriv(ALGORITHM, KEY, IV);
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, KEY, iv);
+
   let encrypted = cipher.update(JSON.stringify(descriptor), "utf8", "hex");
   encrypted += cipher.final("hex");
-  return encrypted;
+
+  const authTag = cipher.getAuthTag().toString("hex");
+
+  return iv.toString("hex") + ":" + encrypted + ":" + authTag;
 }
 
-function decryptDescriptor(encrypted) {
-  const decipher = crypto.createDecipheriv(ALGORITHM, KEY, IV);
+function decryptDescriptor(data) {
+  const [ivHex, encrypted, authTagHex] = data.split(":");
+
+  const decipher = crypto.createDecipheriv(
+    ALGORITHM,
+    KEY,
+    Buffer.from(ivHex, "hex")
+  );
+
+  decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
+
   let decrypted = decipher.update(encrypted, "hex", "utf8");
   decrypted += decipher.final("utf8");
+
   return JSON.parse(decrypted);
 }
 
