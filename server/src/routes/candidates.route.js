@@ -16,6 +16,15 @@ router.get("/", async (req, res) => {
 });
 
 // @route   POST /api/candidates
+// @route   POST /api/candidates/bulk
+router.post("/bulk", async (req, res) => {
+  try {
+    const candidates = await Candidate.insertMany(req.body);
+    res.status(201).json(candidates);
+  } catch (error) {
+    res.status(500).json({ message: "Server Error" });
+  }
+});
 // @desc    Add a new candidate (admin only later)
 // @access  Private
 router.post("/", async (req, res) => {
