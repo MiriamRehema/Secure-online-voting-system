@@ -5,9 +5,8 @@ const jwt = require("jsonwebtoken");
 
 const Admin = require("../models/Admin");
 const protectAdmin = require("../middlewares/authMiddleware");
-router.post("/create-session", protectAdmin, async (req, res) => {
+
   
-});
 const Student = require("../models/Student");
 const Candidate = require("../models/Candidate");
 const VotingSession = require("../models/VotingSession");
@@ -34,7 +33,7 @@ router.post("/login", async (req, res) => {
 
 
 // REGISTER STUDENT (ENROLLMENT)
-router.post("/register-student", async (req, res) => {
+router.post("/register-student",protectAdmin , async (req, res) => {
   const { regNumber, fullName, email, course, year, faceDescriptor } = req.body;
 
   const existing = await Student.findOne({ regNumber });
@@ -57,7 +56,7 @@ router.post("/register-student", async (req, res) => {
 
 
 // CREATE VOTING SESSION
-router.post("/create-session", async (req, res) => {
+router.post("/create-session", protectAdmin, async (req, res) => {
   const { title, startTime, endTime } = req.body;
 
   const session = new VotingSession({
@@ -74,14 +73,40 @@ router.post("/create-session", async (req, res) => {
 
 
 // ADD CANDIDATE
-router.post("/add-candidate", async (req, res) => {
-  const { name, position } = req.body;
+router.post("/add-candidate",protectAdmin, async (req, res) => {
+  const { name, position, party } = req.body;
 
-  const candidate = new Candidate({ name, position });
+  const candidate = new Candidate({ name, position ,party });
   await candidate.save();
 
   res.json({ message: "Candidate added successfully" });
 });
+
+// ==============================
+// 5️⃣ ADMIN DASHBOARD DATA
+// ==============================
+router.get("/dashboard", protectAdmin, async (req, res) => {
+  try {
+    // Fetch students
+    const students = await Student.find().select("-faceDescriptor"); // optional: hide sensitive data
+
+    // Fetch candidates
+    const candidates = await Candidate.find();
+
+    // Fetch active voting sessions
+    const sessions = await VotingSession.find({ isActive: true });
+
+    res.json({
+      students,
+      candidates,
+      sessions,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
 
 module.exports = router;
 
