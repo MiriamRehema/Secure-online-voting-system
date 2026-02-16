@@ -24,7 +24,7 @@ const studentSchema = new mongoose.Schema({
     required: true,
   },
   faceDescriptor: {
-    type: String, // encrypted
+    type: [Number], // encrypted
     required: true,
   },
   hasVoted: {
