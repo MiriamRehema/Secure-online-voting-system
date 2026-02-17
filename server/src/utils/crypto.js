@@ -1,36 +1,64 @@
+// src/utils/crypto.js
 const crypto = require("crypto");
 
 const ALGORITHM = "aes-256-gcm";
-const KEY = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
-const IV_LENGTH = 12; // Recommended for GCM
+const IV_LENGTH = 12;
 
-function encryptDescriptor(descriptor) {
-  const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv(ALGORITHM, KEY, iv);
+function getKey() {
+  const key = process.env.ENCRYPTION_KEY;
 
-  let encrypted = cipher.update(JSON.stringify(descriptor), "utf8", "hex");
-  encrypted += cipher.final("hex");
+  if (!key) {
+    throw new Error(
+      "ENCRYPTION_KEY is not defined. Check your environment configuration."
+    );
+  }
 
-  const authTag = cipher.getAuthTag().toString("hex");
+  const bufferKey = Buffer.from(key, "hex");
 
-  return iv.toString("hex") + ":" + encrypted + ":" + authTag;
+  if (bufferKey.length !== 32) {
+    throw new Error(
+      "ENCRYPTION_KEY must be 64 hex characters (32 bytes for AES-256)."
+    );
+  }
+
+  return bufferKey;
 }
 
-function decryptDescriptor(data) {
-  const [ivHex, encrypted, authTagHex] = data.split(":");
+// Encrypt face descriptor
+function encryptDescriptor(descriptor) {
+  const KEY = getKey();
+  const iv = crypto.randomBytes(IV_LENGTH);
 
-  const decipher = crypto.createDecipheriv(
-    ALGORITHM,
-    KEY,
-    Buffer.from(ivHex, "hex")
-  );
+  const cipher = crypto.createCipheriv(ALGORITHM, KEY, iv);
+  const encrypted = Buffer.concat([
+    cipher.update(descriptor, "utf8"),
+    cipher.final(),
+  ]);
 
-  decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
+  const authTag = cipher.getAuthTag();
 
-  let decrypted = decipher.update(encrypted, "hex", "utf8");
-  decrypted += decipher.final("utf8");
+  return JSON.stringify({
+    iv: iv.toString("hex"),
+    content: encrypted.toString("hex"),
+    tag: authTag.toString("hex"),
+  });
+}
 
-  return JSON.parse(decrypted);
+// Decrypt face descriptor
+function decryptDescriptor(encryptedData) {
+  const KEY = getKey();
+  const json = JSON.parse(encryptedData);
+
+  const iv = Buffer.from(json.iv, "hex");
+  const content = Buffer.from(json.content, "hex");
+  const tag = Buffer.from(json.tag, "hex");
+
+  const decipher = crypto.createDecipheriv(ALGORITHM, KEY, iv);
+  decipher.setAuthTag(tag);
+
+  const decrypted = Buffer.concat([decipher.update(content), decipher.final()]);
+
+  return decrypted.toString("utf8"); // will be JSON string of array
 }
 
 module.exports = { encryptDescriptor, decryptDescriptor };
