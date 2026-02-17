@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import Footer from '../components/Footer';
 
 const FaceRecognitionPage = ({ user, onVerificationSuccess, onVerificationFailed, onCancel }) => {
     const [attemptCount, setAttemptCount] = useState(0);
@@ -210,10 +211,14 @@ const handleCaptureAndVerify = async () => {
             <div className="container">
                 <header className="header">
                     <div className="logo-container">
-                        <img src={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logo-img"/>
+                        <img
+              src={require('../assets/jkuat-logo.png')}
+              alt="JKUAT Logo"
+              className="jkuat-logo-img"
+            />
                     </div>
                     <h1>JKUAT Secure Voting System</h1>
-                    <p className="subtitle">Face Recognition Authentication</p>
+                    <p className="subtitle">Biometric Face Verification</p>
                 </header>
 
                 <div className="screen-container">
@@ -224,12 +229,14 @@ const handleCaptureAndVerify = async () => {
 
                         {error && <div className="alert alert-error">{error}</div>}
 
-                        <div className="info-panel">
-                            <h3>Biometric Verification Required</h3>
-                            <p>Please position your face within the oval for verification. You have <strong>3 attempts</strong> to verify your identity.</p>
-                        </div>
+                        <p className="helper-text">Position your face within the oval to continue</p>
+
+                        
 
                         <div className="face-capture-container">
+                            <div className="camera-status">
+                                    {faceStatus}
+                                </div>
                             <div className="video-container">
                                 <video
                                     ref={videoRef}
@@ -240,11 +247,11 @@ const handleCaptureAndVerify = async () => {
                                 />
                                 <canvas ref={canvasRef} style={{ display: 'none' }} />
                                 <div className="face-overlay" />
-                                <div className="face-status">{faceStatus}</div>
                             </div>
 
                             <div className="attempt-counter">
-                                Attempts: <span className="count">{attemptCount}</span> / 3
+                                Verification Attempts Remaining: 
+                                <span className="count">{3 - attemptCount}</span> 
                             </div>
 
                             {retryTimer !== null && (
@@ -253,24 +260,31 @@ const handleCaptureAndVerify = async () => {
                                 </div>
                             )}
                         </div>
-
+                        
+                        <div className="button-group">
                         <button
                             className="btn btn-primary"
                             onClick={handleCaptureAndVerify}
                             disabled={!cameraReady || retryTimer !== null}
                         >
-                            {cameraReady ? 'Capture & Verify Face': 'Initialize Camera...'}
+                            {cameraReady ? 'Verify Identity': 'Initializing Camera...'}
                         </button>
 
+                        <p className="cancel-note">Cancelling will log you out of the voting session</p>
                         <button className="btn btn-danger" onClick={() => {
                             cleanUpCamera();
                             onCancel();
-                        }}>
-                            Cancel & Logout
+                        }}
+                        > 
+                        Cancel &Logout                           
                         </button>
+                        </div>
+
+                        <div className="security-note">Facial data is encrypted and used strictly for identity verification</div>
                     </div>
                 </div>
             </div>
+            <Footer />
         </div>
     )
 }

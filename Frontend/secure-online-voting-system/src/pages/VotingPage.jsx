@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import Footer from '../components/Footer';
 
 const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResults, onLogout }) => {
     const [candidates, setCandidates] = useState([]);
     const [selectedCandidate, setSelectedCandidate] = useState(null)
+    const [voteSubmitted, setVoteSubmitted] = useState(false)
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
@@ -23,10 +25,10 @@ const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResul
             console.error('Error fetching candidates:', error);
 
             setCandidates([
-                { id: 1, name: 'Candidate A', department: 'Engineering', year:'4th Year', manifesto: 'Manifesto for Candidate A' },
-                { id: 2, name: 'Candidate B', department: 'Business', year:'3rd Year', manifesto: 'Manifesto for Candidate B' },
-                { id: 3, name: 'Candidate C', department: 'Agriculture', year:'4th Year', manifesto: 'Manifesto for Candidate C' },
-                { id: 4, name: 'Candidate D', department: 'ICT', year:'3rd Year', manifesto: 'Manifesto for Candidate D' },
+                { candidate_id: 1, name: 'Alice Wanjiku', department: 'Engineering', year:'4th Year', manifesto: 'Manifesto for Alice Wanjiku' },
+                { candidate_id: 2, name: 'Brian Otieno ', department: 'Business', year:'3rd Year', manifesto: 'Manifesto for Brian Otieno' },
+                { candidate_id: 3, name: 'Catherine Nyambura', department: 'Agriculture', year:'4th Year', manifesto: 'Manifesto for Catherine Nyambura' },
+                { candidate_id: 4, name: 'David Kipchoge', department: 'ICT', year:'3rd Year', manifesto: 'Manifesto for David Kipchoge' },
             ]);
         }
     };
@@ -36,6 +38,7 @@ const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResul
             setError('You have already voted and cannot change your vote.');
             return;
         }
+        console.log('Selected candidate_id:', candidateId)
         setSelectedCandidate(candidateId);
         setError('');
     };
@@ -70,10 +73,10 @@ const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResul
             const data = await response.json();
 
             if (response.ok) {
-                setSuccess('Vote submitted successfully! Your vote has been encrypted and recorded.');
+                setVoteSubmitted(true);
                 onVoteSubmitted();
 
-                setTimeout(() => setSuccess(''), 5000);
+                /*setTimeout(() => setSuccess(''), 5000);*/
             } else {
                 setError(data.message || 'Failed to submit vote.');
             }
@@ -92,82 +95,133 @@ const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResul
             <div className="bg-animation" />
 
             <div className="container">
-                <header className="header">
-                    <div className="logo-container">
-                        <img scr={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logo-img"/>
+                <header className="page-header">
 
+                    <div className="top-bar">
+                        <button className="logout-btn" onClick={onLogout}>
+                            Logout
+                        </button>
                     </div>
-                    <h1>JKUAT Secure Voting System</h1>
-                    <p>JKUSA Elections</p>
-                </header>
+                    <div className="logo-container">
+                        <img
+                          src={require('../assets/jkuat-logo.png')}
+                          alt="JKUAT Logo"
+                           className="jkuat-logo-img"
+                        />
+            
+        </div>
+        <h1 className="main-title">JKUAT Secure Voting System</h1>
+        <p className="subtitle">JKUSA Elections</p>
+        </header>
 
                 <div className="screen-container">
                     <div className="card">
                         <div className="card-header">
-                            <h2>Cast Your Vote</h2>
+                            <h2 className="vote-title">Cast Your Vote</h2>
+                            <p className="vote-subtext">Select your preferred candidate below.
+                                <strong>Your vote is end-to-end encrypted</strong> and cannot be modified once submitted.
+                            </p>
                         </div>
 
                         {error && <div className="alert alert-error">{error}</div>}
-                        {success && <div className="alert alert-success">{success}</div>}
+                        {success && <div className="alert alert-success">
+                            {success}
 
-                        <div className="info-panel">
-                            <h3>JKUSA Student Council Elections</h3>
-                            <p>Select your preferred candidate. Your vote will be encrypted before submission and cannot be changed once cast. Vote anonymity is guaranteed.</p>
-                        </div>
+                            <div className="success-actions">
+                                <button className="btn btn-secondary" onClick={onViewResults}
+                                >View Results</button>
+                                </div>
+                            </div>}
 
                         <div className="status-bar">
                             <div className="status-item">
                                 <span>Voter ID</span>
-                                <strong>{user.student_id}</strong>
+                                <strong>****{user.student_id.slice(-4)}</strong>
                             </div>
                             <div className="status-item">
                                 <span>Session Token:</span>
-                                <strong>{sessionToken.substring(0, 16)}...</strong>
+                                <strong>****{sessionToken.slice(-6)}</strong>
                             </div>
                             <div className="status-item">
                                 <span>Vote Status:</span>
                                 <strong className={hasVoted ? 'voted' : 'not-voted'}>{hasVoted ? 'VOTED' : 'NOT VOTED'}</strong>
                             </div>
                         </div>
+                        {!voteSubmitted ? (
+    <>
+        
+        <h3 className="section-title">Select Your Candidate</h3>
 
-                        <h3 className="section-title">Select Your Candidate</h3>
-                        <div className="candidates-grid">
-                            {candidates.map((candidate) => {
-                                const initials = candidate.name.split('').map(n => n[0]).join('');
-                                return (
-                                    <div
-                                        key={candidate.id}
-                                        className={`candidate-card ${selectedCandidate === candidate.id ? 'selected' : ''} ${hasVoted ? 'disabled' : ''}`}
-                                        onClick={() => handleSelectCandidate(candidate.id)}
-                                    >
-                                        <div className="candidate-avatar">{initials}</div>
-                                        <div className="candidate-name">{candidate.name}</div>
-                                        <div className="candidate-info">{candidate.department} | {candidate.year}<br /> "{candidate.manifesto}</div>
-                                    </div>
-                                );
-                            })}
+        <div className="candidates-grid">
+            {candidates.map((candidate) => {
+                const initials = candidate.name
+                    .trim()
+                    .split(/\s+/)
+                    .map(word => word[0])
+                    .join('')
+                    .toUpperCase();
+
+                return (
+                    <div
+                        key={candidate.candidate_id}
+                        className={`candidate-card ${
+                            selectedCandidate === candidate.candidate_id ? 'selected' : ''
+                        }`}
+                        onClick={() => handleSelectCandidate(candidate.candidate_id)}
+                    >
+                        {selectedCandidate === candidate.candidate_id && (
+                            <div className="selected-tick">✓</div>
+                        )}
+
+                        <div className="candidate-avatar">{initials}</div>
+                        <div className="candidate-name">{candidate.name}</div>
+                        <div className="candidate-info">
+                            {candidate.department} | {candidate.year}
                         </div>
-
-                        <button 
-                            className="btn btn-primary"
-                            onClick={handleSubmitVote}
-                            disabled={!selectedCandidate || hasVoted || loading}
-                        >
-                            {loading ? 'Encrypting Vote...' : 'Submit Encrypted Vote'}
-                        </button>
-
-                        <button className="btn btn-secondary" onClick={onViewResults}>
-                            View Final Results
-                        </button>
-
-                        <button className="btn btn-danger" onClick={onLogout}>
-                            Logout
-                        </button>
                     </div>
-                </div>
-            </div>
+                );
+            })}
         </div>
-    )
+
+        <div className="button-group">
+        <button
+            className="btn btn-primary"
+            onClick={handleSubmitVote}
+            disabled={!selectedCandidate || loading}
+        >
+            {loading ? 'Submitting...' : 'Submit'}
+        </button>
+        </div>
+    </>
+) : (
+    
+    <div className="success-actions">
+        <div className="selected-tick">✓</div>
+        <h2>Your vote has been submitted</h2>
+        <p>
+            Thank you for participating in the election.
+            Your vote has been securely recorded.
+        </p>
+
+        <div className="button-group">
+        <button
+            className="btn btn-secondary"
+            onClick={() =>{
+                console.log("View Results clicked");
+                onViewResults();
+            }}
+        >
+            View Final Results
+        </button>
+        </div>
+    </div>
+)}
+    </div>
+ </div>
+</div>
+<Footer />
+</div>
+ )
 };
 
 export default VotingPage;

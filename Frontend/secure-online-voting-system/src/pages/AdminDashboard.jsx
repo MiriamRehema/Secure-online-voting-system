@@ -1,169 +1,177 @@
 import React, { useState, useEffect } from 'react';
+import Footer from '../components/Footer';
+
+const STATES = {
+  IDLE: 'IDLE',
+  ACTIVE: 'ACTIVE',
+  ENDED: 'ENDED',
+  COUNTED: 'COUNTED',
+  STORED: 'STORED',
+  PUBLISHED: 'PUBLISHED'
+};
 
 const AdminDashboard = ({ user, onLogout }) => {
-    const [votingSessionActive, setVotingSessionActive] =useState(false);
-    const [stats, setStats] = useState({
-        totalVotes: 0,
-        turnout: 0,
-        activeSessions: 0,
-        verifiedVotes: 0
-    });
+  const [phase, setPhase] = useState(STATES.IDLE);
+  const [stats, setStats] = useState({
+    totalVotes: 0,
+    turnout: 0,
+    activeSessions: 0,
+    verifiedVotes: 0
+  });
 
-    useEffect(() => {
-        fetchAdminStats();
-    }, []);
+  useEffect(() => {
+    fetchAdminStats();
+  }, []);
 
-    const fetchAdminStats =async () => {
-        try {
-            const response = await fetch('http://localhost:8000/api/admin/stats');
-            const data = await response.json();
-            if (response.ok) setStats(data);
-        } catch (error) {
-            console.error('Error:', error);
-            //Demo data
-            setStats({ totalVotes: 200, turnout: 40, activeSessions: 5, verifiedVotes: 200});
-        }
-    };
+  const fetchAdminStats = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/admin/stats');
+      const data = await response.json();
+      if (response.ok) {
+        setStats(data);
+        setPhase(data.phase || STATES.IDLE);
+      }
+    } catch {
+      // demo fallback
+      setStats({ totalVotes: 200, turnout: 40, activeSessions: 5, verifiedVotes: 200 });
+      setPhase(STATES.ACTIVE);
+    }
+  };
 
-    const handleStartSession = async () => {
-        try {
-            await fetch('http://localhost:8000/api/admin/start-session', {
-                method: 'POST'
-            });
-            setVotingSessionActive(true);
-            alert('Voting session started!');
-        } catch (error) {
-            setVotingSessionActive(true);
-            alert('Voting session started (Demo)');
-        }
-    };
+  const confirm = (msg) => window.confirm(msg);
 
-    const handleMonitor = () => {
-        fetchAdminStats();
-        alert('Monitoring updated');
-    };
+  const startSession = async () => {
+    if (!confirm('Start voting session?')) return;
+    try {
+     await fetch('http://localhost:8000/api/admin/start-session', { method: 'POST' });
+    } finally {
+      setPhase(STATES.ACTIVE);
+    }
+  };
 
-    const handleEndSession = async () => {
-        try {
-            await fetch('http://localhost:8000/api/admin/end-session', {
-                method: 'POST'
-            });
-            setVotingSessionActive(false);
-            alert('Voting session ended.')
-        } catch (error) {
-            setVotingSessionActive(false);
-            alert('Voting session ended. (Demo');
-        }
-    };
+  const endSession = async () => {
+    if (!confirm('End voting session? No more votes will be accepted.')) return;
+    try {
+        await new Promise(r => setTimeout(r, 600))
+      /*await fetch('http://localhost:8000/api/admin/end-session', { method: 'POST' });*/
+    } finally {
+      setPhase(STATES.ENDED);
+    }
+  };
 
-    const handleRetrieveVotes = async () => {
-        await fetchAdminStats();
-        alert('All votes retrieved!')
-    };
+  const retrieveVotes = async () => {
+    await fetchAdminStats();
+  };
 
-    const handleCountVotes = () => {
-        alert('Votes counted and processed!')
-    };
+  const countVotes = () => {
+    if (!confirm('Process and count all votes?')) return;
+    setPhase(STATES.COUNTED);
+  };
 
-    const handleStoreResults = () => {
-        alert('Final tally results stored!')
-    };
+  const storeResults = async () => {
+    if (!confirm('Store final tally results? This locks the counted votes.')) return;
+    try {
+      /*await fetch('http://localhost:8000/api/admin/store-results', { method: 'POST' });*/
+    } finally {
+      setPhase(STATES.STORED);
+    }
+  };
 
-    const handlePublishResults = () => {
-        alert('Results published successfully!')
-    };
+  const publishResults = async () => {
+    if (!confirm('Publish election results? This action is public and irreversible.')) return;
+    try {
+     /* await fetch('http://localhost:8000/api/admin/publish-results', { method: 'POST' });*/
+    } finally {
+      setPhase(STATES.PUBLISHED);
+    }
+  };
 
-    return (
-        <div className="voting-system">
-            <div className="bg-animation">
+  const PhaseBadge = () => (
+    <div className={`phase-badge ${phase.toLowerCase()}`}>
+      Phase: <strong>{phase}</strong>
+    </div>
+  );
 
-                <div className="container">
-                    <header className="header">
-                        <div className="logo-container">
-                            <img src={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logo-img"/>
-                        </div>
-                        <h1>JKUAT Secure Voting System</h1>
-                        <p className="subtitle">Admin Dashboard</p>
-                    </header>
-
-                    <div className="screen-container">
-                        <div className="card">
-                            <div className="card-header">
-                                <h2>Admin Dashboard</h2>
-                            </div>
-
-                            <div className="info-panel">
-                                <h3>Election Management Console</h3>
-                                <p>Monitor voting sessions, retrieve votes, process results, and publish final tallies</p>
-                            </div>
-
-                            <div className="stats-grid">
-                                <div className="stats-card">
-                                    <div className="stat-value">{stats.totalVotes}</div>
-                                    <div className="stat-label">Votes Recorded</div>
-                                </div>
-                                <div className="stat-card">
-                                    <div className="stat-value">{stats.turnout}</div>
-                                    <div className="stat-label">Turnout Rate</div>
-                                </div>
-                                <div className="stat-card">
-                                    <div className="stat-value">{stats.activeSessions}</div>
-                                    <div className="stat-label">Active Sessions</div>
-                                </div>
-                                <div className="stat-card">
-                                    <div className="stat-value">{stats.verifiedVotes}</div>
-                                    <div className="stat-label">Verified Votes</div>
-                                </div>
-                            </div>
-
-                            <h3 className="section-title">Admin Actions</h3>
-
-                            <button className="btn btn-primary" onClick={handleStartSession}>
-                                Start Voting Session
-                            </button>
-
-                            <button className="btn btn-secondary" onClick={handleMonitor}>
-                                Monitor Voting Process
-                            </button>
-
-                            <button className="btn btn-secondary" onClick={handleEndSession}>
-                                End Voting Session
-                            </button>
-
-                            <button className="btn btn-secondary" onClick={handleRetrieveVotes}>
-                                Retrieve All Votes
-                            </button>
-
-                            <button className="btn btn-secondary" onClick={handleCountVotes}>
-                                Process / Count Votes
-                            </button>
-
-                            <button className="btn btn-secondary" onClick={handleStoreResults}>
-                                Store Final Tally Results
-                            </button>
-
-                            <button className="btn btn-primary" onClick={handlePublishResults}>
-                                Publish Results
-                            </button>
-
-                            <button className="btn btn-danger" onClick={onLogout}>
-                                Logout
-                            </button>
-
-                            {votingSessionActive && (
-                                <div className="status-bar">
-                                    <div className="status-item">
-                                        <span>Voting Status:</span>
-                                        <strong className="active">ACTIVE</strong>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
+  return (
+    <div className="voting-system">
+      <div className="container">
+        <div className="top-bar">
+            <button className="logout-btn" onClick={onLogout}>
+                Logout
+            </button>
         </div>
-    );
+        <header className="page-header">
+          <div className="logo-container">
+            <img src={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logo-img" />
+          </div>
+          <h1>JKUAT Secure Voting System</h1>
+          <p className="subtitle">Admin Dashboard</p>
+        </header>
+
+        <div className="card wide-card">
+          <PhaseBadge />
+
+          
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-value">{stats.totalVotes}</div>
+              <div className="stat-label">Votes</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{stats.turnout}%</div>
+              <div className="stat-label">Turnout</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{stats.activeSessions}</div>
+              <div className="stat-label">Sessions</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{stats.verifiedVotes}</div>
+              <div className="stat-label">Verified</div>
+            </div>
+          </div>
+
+          
+          <div className="workflow-grid">
+            <div className="button-group">
+            <section>
+              <h3>Voting</h3>
+              <button className="btn btn-primary" disabled={phase !== STATES.IDLE} onClick={startSession}>
+                Start Session
+              </button>
+              <button className="btn btn-secondary" disabled={phase !== STATES.ACTIVE} onClick={endSession}>
+                End Session
+              </button>
+            </section>
+
+            <section>
+              <h3>Counting</h3>
+              <button className="btn btn-secondary" disabled={phase !== STATES.ENDED} onClick={retrieveVotes}>
+                Retrieve Votes
+              </button>
+              <button className="btn btn-secondary" disabled={phase !== STATES.ENDED} onClick={countVotes}>
+                Count Votes
+              </button>
+            </section>
+
+            <section>
+              <h3>Finalization</h3>
+              <button className="btn btn-secondary" disabled={phase !== STATES.COUNTED} onClick={storeResults}>
+                Store Tally
+              </button>
+              <button className="btn btn-primary" disabled={phase !== STATES.STORED} onClick={publishResults}>
+                Publish Results
+              </button>
+            </section>
+          </div>
+          </div>
+        </div>
+      </div>
+      <Footer />
+    </div>
+  );
 };
 
 export default AdminDashboard;
+
+

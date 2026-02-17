@@ -1,47 +1,69 @@
 import React from 'react';
+import Footer from '../components/Footer';
+
+
 
 const HomePage = ({ onSelectUserType }) => {
-    return (
-        <div className="voting-system">
-            <div className="bg-animation" />
+  return (
+    <div className="voting-system">
+      <div className="container">
 
-            <div className='container'>
-                <header>
-                    <div className="logo-container">
-                        <img src={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logo-img"/>
-                    </div>
-                    <h1>JKUAT Secure Voting System</h1>
-                    <p className="subtitle">Face Recognition-Based Authentication | JKUSA Elections</p>
-                </header>
+        <div className="page-header">
+          <div className="logo-container">
+            <img
+              src={require('../assets/jkuat-logo.png')}
+              alt="JKUAT Logo"
+              className="jkuat-logo-img"
+            />
+          </div>
 
-                <div className="screen-container">
-                    <div className="card centered-card">
-                        <div className="card-header">
-                            <h2>Welcome to JKUAT Secure Voting System</h2>
+          <h1>JKUAT Secure Voting System</h1>
 
-                        </div>
+          <p className="subtitle">
+            Face Recognition-Based Authentication | JKUSA Elections
+          </p>
 
-                        <div className="info-panel">
-                            <h3>JKUSA Student Leaders Election</h3>
-                            <p>This is a secure, face recognition-based online voting system for JKUSA elections. Your identity will be verified using biometric authentication before you can cast your vote</p>
+          <div className="security-badge">
+             <span>AES-256 Encrypted</span>
+             <span>Biometric Verified</span>
+             <span>One Person, One Vote</span>
+          </div>
+        </div>
 
-                        </div>
-                        <button className="btn btn-primary" onClick={() => onSelectUserType('student')}>
-                            Student Login
-                        </button>
+        <div className="screen-container">
+          <div className="card centered-card">
 
-                        <button className="btn btn-secondary" onClick={() => onSelectUserType('admin')}>
-                            Admin Login
-                        </button>
+            <h2 className="card-title">
+              Welcome to JKUSA Student Leaders Election
+            </h2>
 
-                    </div>
+            <p className="card-description">
+                A secure biometric-based online voting platform for JKUSA student elections. Identity verification is performed using facial recognition and AES-256 encryption before vote submission.
+            </p>
 
-                </div>
+            <div className="button-group">
+            <button
+              className="btn btn-primary"
+              onClick={() => onSelectUserType('student')}
+            >
+              Student Login
+            </button>
 
+            <button
+              className="btn btn-secondary"
+              onClick={() => onSelectUserType('admin')}
+            >
+               Admin Login
+            </button>
             </div>
 
+          </div>
         </div>
-    );
+
+      </div>
+      <Footer />
+    </div>
+  );
 };
 
 export default HomePage;

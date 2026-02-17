@@ -1,4 +1,5 @@
 import react, { useState } from 'react';
+import Footer from '../components/Footer';
 
 const LoginPage = ({ userType, onLoginSuccess, onBack }) => {
     const [credentials, setCredentials] = useState({ regNumber: '', password: '' });
@@ -55,7 +56,7 @@ const LoginPage = ({ userType, onLoginSuccess, onBack }) => {
             <div className="bg-animation" />
 
             <div className="container">
-                <header className="header">
+                <header className="page-header">
                     <div className="logo-container">
                         <img src={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logo-img"/>
 
@@ -97,7 +98,7 @@ const LoginPage = ({ userType, onLoginSuccess, onBack }) => {
                                     required
                                 />
                             </div>
-
+                            <div className="button-group">
                             <button type="submit" className="btn btn-primary" disabled={loading}>
                                 {loading ? 'Validating...' : 'Login'}
                             </button>
@@ -105,17 +106,16 @@ const LoginPage = ({ userType, onLoginSuccess, onBack }) => {
                             <button type="button" className="btn btn-secondary" onClick={onBack}>
                                 Back to Home
                             </button>
+                            </div>
                         </form>
+                           
 
-                        <div className="demo-box">
-                            <h4>Demo Credentials</h4>
-                            <p><strong>Student:</strong> <code>SCT111-0111/1900 | password4321</code></p>
-                            <p><strong>Admin:</strong> <code>ADM001 | admin4321</code></p>
-                        </div>
+                       
                     </div>
                 </div>
 
             </div>
+            <Footer />
         </div>
     );
 };

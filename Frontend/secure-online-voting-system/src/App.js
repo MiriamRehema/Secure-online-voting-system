@@ -13,6 +13,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [sessionToken, setSessionToken] = useState(null);
   const [hasVoted, setHasVoted] = useState(false);
+  /*const [screen, setScreen] = useState("vote")*/
 
   const goToLogin = (type) => {
     console.log('Navigating to login:', type);
@@ -57,6 +58,10 @@ function App() {
     console.log('Vote submitted');
     setHasVoted(true);
   };
+
+  /*const handleViewResults = () => {
+    setScreen("results");
+  }*/
 
   const backToVoting = () => {
     console.log('Going back to voting')
