@@ -6,6 +6,10 @@ const studentSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  password: {
+    type: String,
+    required: true,
+  },
   fullName: {
     type: String,
     required: true,
@@ -24,7 +28,7 @@ const studentSchema = new mongoose.Schema({
     required: true,
   },
   faceDescriptor: {
-    type: [Number], // encrypted
+    type: mongoose.Schema.Types.Mixed,
     required: true,
   },
   hasVoted: {
