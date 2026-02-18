@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import jkuatLogo from '../assets/jkuat-logo.png';
-import Footer from '../components/Footer';
+import  Footer  from '../components/Footer';
 
 const ResultsPage = ({ onBack, onLogout }) => {
     const [results, setResults] = useState([]);

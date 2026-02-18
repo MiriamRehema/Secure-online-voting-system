@@ -86,8 +86,8 @@ function App() {
       {currentPage === 'home' && (
         <HomePage onSelectUserType={goToLogin} />
       )}
-
-      {currentPage === 'login' && (
+     
+     {currentPage === 'login' && (
         <LoginPage
           userType={userType}
           onLoginSuccess={handleLoginSuccess}

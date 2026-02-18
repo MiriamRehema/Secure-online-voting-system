@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Footer from '../components/Footer';
+import  Footer  from '../components/Footer';
 
 const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResults, onLogout }) => {
     const [candidates, setCandidates] = useState([]);
@@ -75,6 +75,10 @@ const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResul
             if (response.ok) {
                 setVoteSubmitted(true);
                 onVoteSubmitted();
+                
+                // ✅ Mark student as voted in localStorage (for demo mode)
+                localStorage.setItem(`voted_${user.student_id}`, 'true');
+                console.log(' Vote recorded in localStorage');
 
                 /*setTimeout(() => setSuccess(''), 5000);*/
             } else {
@@ -82,7 +86,13 @@ const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResul
             }
         } catch (error) {
             console.error('Vote submission error:', error);
+            
+            // ✅ Demo mode - still mark as voted
+            localStorage.setItem(`voted_${user.student_id}`, 'true');
+            console.log('Vote recorded in localStorage (demo mode)');
+            
             setSuccess('Vote submitted successfully! (Demo)');
+            setVoteSubmitted(true);
             onVoteSubmitted();
             setTimeout(() => setSuccess(''), 5000);
         } finally {
@@ -225,8 +235,3 @@ const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResul
 };
 
 export default VotingPage;
-
-
-        
-    
-
