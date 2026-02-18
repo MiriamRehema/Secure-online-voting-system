@@ -1,3 +1,6 @@
+process.env.JWT_SECRET = "testsecretkey123456789012345678901234567890"; // must be long enough
+
+
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
@@ -10,13 +13,14 @@ const protectAdmin = require("../middlewares/authMiddleware");
 const Student = require("../models/Student");
 const Candidate = require("../models/Candidate");
 const VotingSession = require("../models/VotingSession");
+const { encryptDescriptor } = require("../utils/crypto");
 
 
 // ADMIN LOGIN
 router.post("/login", async (req, res) => {
-  const { username, password } = req.body;
+  const { regNumber, password } = req.body;
 
-  const admin = await Admin.findOne({ username });
+  const admin = await Admin.findOne({ regNumber });
   if (!admin) return res.status(401).json({ message: "Invalid credentials" });
 
   const isMatch = await bcrypt.compare(password, admin.password);
@@ -26,32 +30,47 @@ router.post("/login", async (req, res) => {
     { id: admin._id, role: admin.role },
     process.env.JWT_SECRET,
     { expiresIn: "1d" }
-  );
+  );        
 
   res.json({ token, role: admin.role });
 });
 
 
-// REGISTER STUDENT (ENROLLMENT)
-router.post("/register-student",protectAdmin , async (req, res) => {
+// 1️⃣ ADMIN REGISTERS STUDENT
+// ==============================
+
+
+router.post("/register",protectAdmin , async (req, res) => {
+  if (req.admin.role !== "mainAdmin") {
+    return res.status(403).json({ message: "Only main admin can register students" });
+  }
   const { regNumber, fullName, email, course, year, faceDescriptor } = req.body;
 
-  const existing = await Student.findOne({ regNumber });
-  if (existing)
-    return res.status(400).json({ message: "Student already exists" });
+  if (!regNumber || !fullName || !email || !course || !year || !faceDescriptor) {
+    return res.status(400).json({ message: "All fields required" });
+  }
 
-  const student = new Student({
-    regNumber,
-    fullName,
-    email,
-    course,
-    year,
-    faceDescriptor,
-  });
+  try {
+    const existing = await Student.findOne({ regNumber });
+    if (existing) return res.status(400).json({ message: "Student already exists" });
 
-  await student.save();
+    const encryptedFace = encryptDescriptor(JSON.stringify(faceDescriptor));
 
-  res.json({ message: "Student registered successfully" });
+    const student = new Student({
+      regNumber,
+      fullName,
+      email,
+      course,
+      year,
+      faceDescriptor: encryptedFace,
+    });
+
+    await student.save();
+    res.status(201).json({ message: "Student registered successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server Error" });
+  }
 });
 
 
@@ -82,19 +101,29 @@ router.post("/add-candidate",protectAdmin, async (req, res) => {
   res.json({ message: "Candidate added successfully" });
 });
 
-// ==============================
-// 5️⃣ ADMIN DASHBOARD DATA
-// ==============================
+// 5️⃣ ADMIN DASHBOARD DATA (role-based)
 router.get("/dashboard", protectAdmin, async (req, res) => {
   try {
-    // Fetch students
-    const students = await Student.find().select("-faceDescriptor"); // optional: hide sensitive data
+    const adminRole = req.admin.role; // we attached admin in the middleware
 
-    // Fetch candidates
-    const candidates = await Candidate.find();
+    let students = [];
+    let candidates = [];
+    let sessions = [];
 
-    // Fetch active voting sessions
-    const sessions = await VotingSession.find({ isActive: true });
+    if (adminRole === "mainAdmin") {
+      // Main admin can see everything
+      students = await Student.find().select("-faceDescriptor"); // hide sensitive face data
+      candidates = await Candidate.find();
+      sessions = await VotingSession.find({ isActive: true });
+    } else if (adminRole === "electionOfficer") {
+      // Election officer only sees candidates & their results
+      candidates = await Candidate.find();
+      // optionally you could include vote counts here
+      sessions = await VotingSession.find({ isActive: true });
+      // students array stays empty
+    } else {
+      return res.status(403).json({ message: "Access forbidden for this role" });
+    }
 
     res.json({
       students,
