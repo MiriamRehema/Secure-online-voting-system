@@ -1,4 +1,6 @@
 const dotenv = require("dotenv");
+const cors = require('cors');
+app.use(cors());
 const path = require("path");
 dotenv.config({
   path: process.env.NODE_ENV === "test" 
