@@ -15,7 +15,7 @@ const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResul
 
     const fetchCandidates = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/candidates')
+            const response = await fetch('http://localhost:5000/api/candidates')
             const data = await response.json();
 
             if (response.ok) {
@@ -58,7 +58,7 @@ const VotingPage = ({ user, sessionToken, hasVoted, onVoteSubmitted, onViewResul
         setError('');
 
         try {
-            const response = await fetch('http://localhost:8000/api/vote/submit', {
+            const response = await fetch('http://localhost:5000/api/vote/submit', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

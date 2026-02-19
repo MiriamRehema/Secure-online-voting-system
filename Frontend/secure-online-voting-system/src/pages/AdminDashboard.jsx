@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import  Footer  from '../components/Footer';
+import Footer from '../components/Footer';
 
 const STATES = {
   IDLE: 'IDLE',
@@ -12,6 +12,7 @@ const STATES = {
 
 const AdminDashboard = ({ user, onLogout }) => {
   const [phase, setPhase] = useState(STATES.IDLE);
+
   const [stats, setStats] = useState({
     totalVotes: 0,
     turnout: 0,
@@ -19,13 +20,25 @@ const AdminDashboard = ({ user, onLogout }) => {
     verifiedVotes: 0
   });
 
+  // ===================== NEW STUDENT STATE =====================
+  const [studentForm, setStudentForm] = useState({
+    regNumber: '',
+    fullName: '',
+    year: '',
+    email: '',
+    course: '',
+    faceDescriptor: ''
+  });
+
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     fetchAdminStats();
   }, []);
 
   const fetchAdminStats = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/admin/stats');
+      const response = await fetch('http://localhost:5000/api/admin/dashboard');
       const data = await response.json();
       if (response.ok) {
         setStats(data);
@@ -40,10 +53,11 @@ const AdminDashboard = ({ user, onLogout }) => {
 
   const confirm = (msg) => window.confirm(msg);
 
+  // ===================== SESSION CONTROL =====================
   const startSession = async () => {
     if (!confirm('Start voting session?')) return;
     try {
-     await fetch('http://localhost:8000/api/admin/start-session', { method: 'POST' });
+      await fetch('http://localhost:5000/api/admin/create-session', { method: 'POST' });
     } finally {
       setPhase(STATES.ACTIVE);
     }
@@ -52,8 +66,7 @@ const AdminDashboard = ({ user, onLogout }) => {
   const endSession = async () => {
     if (!confirm('End voting session? No more votes will be accepted.')) return;
     try {
-        await new Promise(r => setTimeout(r, 600))
-      /*await fetch('http://localhost:8000/api/admin/end-session', { method: 'POST' });*/
+      await new Promise(r => setTimeout(r, 600));
     } finally {
       setPhase(STATES.ENDED);
     }
@@ -71,7 +84,7 @@ const AdminDashboard = ({ user, onLogout }) => {
   const storeResults = async () => {
     if (!confirm('Store final tally results? This locks the counted votes.')) return;
     try {
-      /*await fetch('http://localhost:8000/api/admin/store-results', { method: 'POST' });*/
+      // await fetch('http://localhost:5000/api/admin/store-results', { method: 'POST' });
     } finally {
       setPhase(STATES.STORED);
     }
@@ -80,9 +93,52 @@ const AdminDashboard = ({ user, onLogout }) => {
   const publishResults = async () => {
     if (!confirm('Publish election results? This action is public and irreversible.')) return;
     try {
-     /* await fetch('http://localhost:8000/api/admin/publish-results', { method: 'POST' });*/
+      // await fetch('http://localhost:5000/api/admin/publish-results', { method: 'POST' });
     } finally {
       setPhase(STATES.PUBLISHED);
+    }
+  };
+
+  // ===================== ADD STUDENT =====================
+  const handleStudentChange = (e) => {
+    setStudentForm({
+      ...studentForm,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const addStudent = async (e) => {
+    e.preventDefault();
+
+    if (!confirm('Add this student?')) return;
+
+    setLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:5000/api/admin/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(studentForm)
+      });
+
+      if (!response.ok) {
+        alert('Failed to add student');
+        return;
+      }
+
+      setStudentForm({
+        regNumber: '',
+        fullName: '',
+        year: '',
+        email: '',
+        course: '',
+        faceDescriptor: '',
+      });
+
+    } catch (error) {
+      alert('Server error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -95,23 +151,29 @@ const AdminDashboard = ({ user, onLogout }) => {
   return (
     <div className="voting-system">
       <div className="container">
+
         <div className="top-bar">
-            <button className="logout-btn" onClick={onLogout}>
-                Logout
-            </button>
+          <button className="logout-btn" onClick={onLogout}>
+            Logout
+          </button>
         </div>
+
         <header className="page-header">
           <div className="logo-container">
-            <img src={require('../assets/jkuat-logo.png')} alt="JKUAT Logo" className="jkuat-logo-img" />
+            <img
+              src={require('../assets/jkuat-logo.png')}
+              alt="JKUAT Logo"
+              className="jkuat-logo-img"
+            />
           </div>
           <h1>JKUAT Secure Voting System</h1>
           <p className="subtitle">Admin Dashboard</p>
         </header>
 
         <div className="card wide-card">
+
           <PhaseBadge />
 
-          
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-value">{stats.totalVotes}</div>
@@ -131,47 +193,93 @@ const AdminDashboard = ({ user, onLogout }) => {
             </div>
           </div>
 
-          
           <div className="workflow-grid">
             <div className="button-group">
-            <section>
-              <h3>Voting</h3>
-              <button className="btn btn-primary" disabled={phase !== STATES.IDLE} onClick={startSession}>
-                Start Session
-              </button>
-              <button className="btn btn-secondary" disabled={phase !== STATES.ACTIVE} onClick={endSession}>
-                End Session
-              </button>
-            </section>
 
-            <section>
-              <h3>Counting</h3>
-              <button className="btn btn-secondary" disabled={phase !== STATES.ENDED} onClick={retrieveVotes}>
-                Retrieve Votes
-              </button>
-              <button className="btn btn-secondary" disabled={phase !== STATES.ENDED} onClick={countVotes}>
-                Count Votes
-              </button>
-            </section>
+              <section>
+                <h3>Voting</h3>
+                <button className="btn btn-primary" disabled={phase !== STATES.IDLE} onClick={startSession}>
+                  Start Session
+                </button>
+                <button className="btn btn-secondary" disabled={phase !== STATES.ACTIVE} onClick={endSession}>
+                  End Session
+                </button>
+              </section>
 
-            <section>
-              <h3>Finalization</h3>
-              <button className="btn btn-secondary" disabled={phase !== STATES.COUNTED} onClick={storeResults}>
-                Store Tally
-              </button>
-              <button className="btn btn-primary" disabled={phase !== STATES.STORED} onClick={publishResults}>
-                Publish Results
-              </button>
-            </section>
+              <section>
+                <h3>Counting</h3>
+                <button className="btn btn-secondary" disabled={phase !== STATES.ENDED} onClick={retrieveVotes}>
+                  Retrieve Votes
+                </button>
+                <button className="btn btn-secondary" disabled={phase !== STATES.ENDED} onClick={countVotes}>
+                  Count Votes
+                </button>
+              </section>
+
+              <section>
+                <h3>Finalization</h3>
+                <button className="btn btn-secondary" disabled={phase !== STATES.COUNTED} onClick={storeResults}>
+                  Store Tally
+                </button>
+                <button className="btn btn-primary" disabled={phase !== STATES.STORED} onClick={publishResults}>
+                  Publish Results
+                </button>
+              </section>
+
+            </div>
           </div>
-          </div>
+
+          <section className="admin-section">
+            <h3>Add New Student</h3>
+
+            <form className="student-form" onSubmit={addStudent}>
+              <input
+                type="text"
+                name="fullName"
+                placeholder="Full Name"
+                value={studentForm.fullName}
+                onChange={handleStudentChange}
+                required
+              />
+
+              <input
+                type="text"
+                name="year"
+                placeholder="Year (e.g. 3)"
+                value={studentForm.year}
+                onChange={handleStudentChange}
+                required
+              />
+
+              <input
+                type="email"
+                name="email"
+                placeholder="Email Address"
+                value={studentForm.email}
+                onChange={handleStudentChange}
+                required
+              />
+
+              <input
+                type="text"
+                name="course"
+                placeholder="Course"
+                value={studentForm.course}
+                onChange={handleStudentChange}
+                required
+              />
+
+              <button className="btn btn-primary" type="submit" disabled={loading}>
+                {loading ? 'Adding...' : 'Add Student'}
+              </button>
+            </form>
+          </section>
+
         </div>
       </div>
+
       <Footer />
     </div>
   );
 };
-
-export default AdminDashboard;
-
-
+export default AdminDashboard
