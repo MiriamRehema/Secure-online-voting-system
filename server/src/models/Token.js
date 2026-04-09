@@ -5,18 +5,24 @@ const tokenSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  studentId: {
+  student: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Student",
   },
-  sessionId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "VotingSession",
-  },
+  election: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Election",
+},
   used: {
     type: Boolean,
     default: false,
   },
+  
+  expiresAt:Date
 });
+tokenSchema.index(
+  { student: 1, election: 1 },
+  { unique: true }
+);
 
 module.exports = mongoose.model("Token", tokenSchema);
