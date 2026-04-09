@@ -26,7 +26,11 @@ describe("STUDENT ROUTES", () => {
       faceDescriptor: encryptedFace, 
       hasVoted: false,
       password:hashed,
+
+       
+    
     });
+   
   });
 
   afterEach(async () => {
