@@ -1,108 +1,92 @@
 const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
-const bcrypt = require("bcryptjs");
+//const bcrypt = require("bcryptjs");
 
 const Student = require("../models/Student");
 const { encryptDescriptor, decryptDescriptor } = require("../utils/crypto");
 
 const Token = require("../models/Token");
-const VotingSession = require("../models/VotingSession");
 
 
 
-// ==============================
 
+const Election = require("../models/Election");
+const Vote = require("../models/Vote");
 
-// ==============================
-// 2️⃣ STUDENT LOGIN
-// ==============================
-router.post("/login", async (req, res) => {
-  const { regNumber, password } = req.body;
-
-  if (!regNumber || !password) return res.status(400).json({ message: "Reg number and password required" });
-
-  try {
-    const student = await Student.findOne({ regNumber: regNumber });
-     if (!student) return res.status(401).json({ message: "Invalid credentials" });
-
-    const isMatch = await bcrypt.compare(password, student.password);
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
-
-     res.status(200).json({
-       studentId: student._id,
-       hasVoted: student.hasVoted,
-       });
-
-    
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server Error" });
-  }
-});
-
-// ==============================
-// 3️⃣ FACE VERIFICATION
-// ==============================
 router.post("/verify-face", async (req, res) => {
-  const { studentId, faceDescriptor } = req.body;
-
-  // ✅ ADD THIS VALIDATION HERE
-  if (!studentId || !faceDescriptor) {
-    return res.status(400).json({ message: "Missing data" });
-  }
-   const activeSession = await VotingSession.findOne({ isActive: true });
-   if (!activeSession) {
-      return res.status(404).json({ message: "No active voting session" });
-     }
-
   try {
+    const { studentId, faceDescriptor } = req.body;
+
+    if (!studentId || !faceDescriptor) {
+      return res.status(400).json({ message: "Missing data" });
+    }
+
+    // 🔍 Get active election
+    const election = await Election.findOne({ status: "active" });
+    if (!election) {
+      return res.status(404).json({ message: "No active election" });
+    }
+
+    //  Get student
     const student = await Student.findById(studentId);
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
 
-        const decryptedDescriptor = JSON.parse(
-          decryptDescriptor(student.faceDescriptor)
-        );
+    //  Already voted
+    const alreadyVoted = await Vote.findOne({
+      student: student._id,
+      election: election._id,
+    });
 
-        const distance = calculateDistance(decryptedDescriptor, faceDescriptor);
+    if (alreadyVoted) {
+      return res.status(400).json({ message: "Already voted" });
+    }
 
-       // inside /verify-face route after successful verification
-      if (distance < 0.6) {
-  // generate token
-      let existingToken = await Token.findOne({ studentId: student._id, sessionId: activeSession._id });
-       if (!existingToken) {
-        const tokenString = crypto.randomBytes(32).toString("hex");
-          const token = await Token.create({
-          token: tokenString,
-          studentId: student._id,
-          sessionId: activeSession._id,
-        });
-          return res.status(200).json({ verified: true, token: tokenString });
-        } else {
-          return res.status(200).json({ verified: true, token: existingToken.token });
-         }
-         } else {
-  return res.status(401).json({ verified: false });
+    //  Decrypt stored face
+    const decryptedDescriptor = JSON.parse(
+      decryptDescriptor(student.faceDescriptor)
+    );
+
+    //  Compare faces
+    if (!Array.isArray(faceDescriptor)) {
+  return res.status(400).json({ message: "Invalid face data" });
 }
+    const distance = calculateDistance(decryptedDescriptor, faceDescriptor);
 
+    const THRESHOLD = process.env.FACE_THRESHOLD || 0.6;
+if (distance < THRESHOLD) {
+
+      //  Generate or reuse token
+      let existingToken = await Token.findOne({
+        student: student._id,
+        election: election._id,
+        used: false,
+      });
+
+      if (!existingToken) {
+        const tokenString = crypto.randomBytes(32).toString("hex");
+
+        await Token.create({
+          token: tokenString,
+          student: student._id,
+          election: election._id,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 min
+        });
+
+        return res.json({ verified: true, token: tokenString });
+      }
+
+      return res.json({ verified: true, token: existingToken.token });
+
+    } else {
+      return res.status(401).json({ verified: false });
+    }
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server Error" });
+    res.status(500).json({ message: "Server error" });
   }
 });
-
-// ==============================
-// FACE DISTANCE FUNCTION
-// ==============================
-function calculateDistance(desc1, desc2) {
-  let sum = 0;
-  for (let i = 0; i < desc1.length; i++) {
-    sum += Math.pow(desc1[i] - desc2[i], 2);
-  }
-  return Math.sqrt(sum);
-}
-
 module.exports = router;
