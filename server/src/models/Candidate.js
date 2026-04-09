@@ -13,7 +13,7 @@ const candidateSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  votes: {
+  voteCount: {
     type: Number,
     default: 0, // start with 0 votes
   },
@@ -21,6 +21,10 @@ const candidateSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  isActive:{
+    type:Boolean,
+    default:true
+  }
 });
 
 
