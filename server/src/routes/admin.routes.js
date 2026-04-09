@@ -1,46 +1,29 @@
-process.env.JWT_SECRET = "testsecretkey123456789012345678901234567890"; // must be long enough
+
 
 
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const AuditLog = require("../models/AuditLog");
 
-const Admin = require("../models/Admin");
+const Vote = require("../models/Vote");
 const protectAdmin = require("../middlewares/authMiddleware");
 
-  
+const Election = require("../models/Election");
 const Student = require("../models/Student");
 const Candidate = require("../models/Candidate");
-const VotingSession = require("../models/VotingSession");
+
 const { encryptDescriptor } = require("../utils/crypto");
 
 
-// ADMIN LOGIN
-router.post("/login", async (req, res) => {
-  const { regNumber, password } = req.body;
-
-  const admin = await Admin.findOne({ regNumber });
-  if (!admin) return res.status(401).json({ message: "Invalid credentials" });
-
-  const isMatch = await bcrypt.compare(password, admin.password);
-  if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
-
-  const token = jwt.sign(
-    { id: admin._id, role: admin.role },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" }
-  );        
-
-  res.json({ token, role: admin.role });
-});
 
 
 // 1️⃣ ADMIN REGISTERS STUDENT
 // ==============================
 
 
-router.post("/register",protectAdmin , async (req, res) => {
+router.post("/students",protectAdmin , async (req, res) => {
   if (req.admin.role !== "mainAdmin") {
     return res.status(403).json({ message: "Only main admin can register students" });
   }
@@ -64,8 +47,17 @@ router.post("/register",protectAdmin , async (req, res) => {
       year,
       faceDescriptor: encryptedFace,
     });
+    
 
-    await student.save();
+    logAudit("STUDENT_REGISTER", {
+      userId: req.admin._id,
+      userModel: "Admin",
+      details: { studentId: student._id },
+      ipAddress: req.ip,
+      status: "SUCCESS",
+    });
+
+    
     res.status(201).json({ message: "Student registered successfully" });
   } catch (err) {
     console.error(err);
@@ -74,67 +66,167 @@ router.post("/register",protectAdmin , async (req, res) => {
 });
 
 
-// CREATE VOTING SESSION
-router.post("/create-session", protectAdmin, async (req, res) => {
-  const { title, startTime, endTime } = req.body;
 
-  const session = new VotingSession({
-    title,
-    startTime,
-    endTime,
-    isActive: true,
-  });
-
-  await session.save();
-
-  res.json({ message: "Voting session created", session });
-});
-
-
-// ADD CANDIDATE
-router.post("/add-candidate",protectAdmin, async (req, res) => {
-  const { name, position, party } = req.body;
-
-  const candidate = new Candidate({ name, position ,party });
-  await candidate.save();
-
-  res.json({ message: "Candidate added successfully" });
-});
-
-// 5️⃣ ADMIN DASHBOARD DATA (role-based)
-router.get("/dashboard", protectAdmin, async (req, res) => {
+// ==============================
+// 🗳️ CREATE ELECTION
+// ==============================
+router.post("/elections", protectAdmin, async (req, res) => {
   try {
-    const adminRole = req.admin.role; // we attached admin in the middleware
-
-    let students = [];
-    let candidates = [];
-    let sessions = [];
-
-    if (adminRole === "mainAdmin") {
-      // Main admin can see everything
-      students = await Student.find().select("-faceDescriptor"); // hide sensitive face data
-      candidates = await Candidate.find();
-      sessions = await VotingSession.find({ isActive: true });
-    } else if (adminRole === "electionOfficer") {
-      // Election officer only sees candidates & their results
-      candidates = await Candidate.find();
-      // optionally you could include vote counts here
-      sessions = await VotingSession.find({ isActive: true });
-      // students array stays empty
-    } else {
-      return res.status(403).json({ message: "Access forbidden for this role" });
+    if (req.admin.role !== "mainAdmin") {
+      return res.status(403).json({ message: "Not allowed" });
     }
 
-    res.json({
-      students,
-      candidates,
-      sessions,
+    const { title, description, startDate, endDate, allowedCourses } = req.body;
+
+    if (new Date(endDate) <= new Date(startDate)) {
+      return res.status(400).json({ message: "Invalid dates" });
+    }
+
+    const election = await Election.create({
+      title,
+      description,
+      startDate,
+      endDate,
+      allowedCourses,
+      status: "upcoming",
+      createdBy: req.admin._id,
     });
+
+    logAudit("ELECTION_CREATE", {
+      userId: req.admin._id,
+      userModel: "Admin",
+      details: { electionId: election._id },
+      ipAddress: req.ip,
+      status: "SUCCESS",
+    });
+
+    res.status(201).json(election);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server Error" });
+    res.status(500).json({ message: "Error creating election" });
   }
 });
+
+
+// ==============================
+// 📝 GET ALL ELECTIONS
+// ==============================
+router.get("/elections", protectAdmin, async (req, res) => {
+  try {
+    const elections = await Election.find()
+      .populate("candidates")
+      .sort({ createdAt: -1 });
+
+    res.json(elections);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching elections" });
+  }
+});
+
+
+// ==============================
+// 🔄 UPDATE ELECTION STATUS
+// ==============================
+router.put("/elections/:id/status", protectAdmin, async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    const election = await Election.findById(req.params.id);
+    if (!election) {
+      return res.status(404).json({ message: "Election not found" });
+    }
+
+    election.status = status;
+    await election.save();
+
+    logAudit("ELECTION_STATUS_UPDATE", {
+      userId: req.admin._id,
+      userModel: "Admin",
+      details: { electionId: election._id, status },
+      ipAddress: req.ip,
+      status: "SUCCESS",
+    });
+
+    res.json(election);
+  } catch (err) {
+    res.status(500).json({ message: "Error updating election" });
+  }
+});
+
+
+// ==============================
+// 👤 ADD CANDIDATE
+// ==============================
+router.post("/elections/:id/candidates", protectAdmin, async (req, res) => {
+  try {
+    const { name, position, party } = req.body;
+
+    const election = await Election.findById(req.params.id);
+    if (!election) {
+      return res.status(404).json({ message: "Election not found" });
+    }
+
+    const candidate = await Candidate.create({
+      name,
+      position,
+      party,
+      election: election._id,
+    });
+
+    election.candidates.push(candidate._id);
+    await election.save();
+
+    logAudit("CANDIDATE_CREATE", {
+      userId: req.admin._id,
+      userModel: "Admin",
+      details: { candidateId: candidate._id },
+      ipAddress: req.ip,
+      status: "SUCCESS",
+    });
+
+    res.status(201).json(candidate);
+  } catch (err) {
+    res.status(500).json({ message: "Error adding candidate" });
+  }
+});
+
+
+// ==============================
+// 📊 DASHBOARD STATS
+// ==============================
+router.get("/dashboard", protectAdmin, async (req, res) => {
+  try {
+    const totalStudents = await Student.countDocuments();
+    const totalVotes = await Vote.countDocuments();
+    const totalElections = await Election.countDocuments();
+    const activeElections = await Election.countDocuments({ status: "active" });
+
+    res.json({
+      totalStudents,
+      totalVotes,
+      totalElections,
+      activeElections,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching stats" });
+  }
+});
+
+
+// ==============================
+// 📜 AUDIT LOGS
+// ==============================
+router.get("/audit-logs", protectAdmin, async (req, res) => {
+  try {
+    const logs = await AuditLog.find()
+      .sort({ timestamp: -1 })
+      .limit(50);
+
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching logs" });
+  }
+});
+
 
 
 module.exports = router;
