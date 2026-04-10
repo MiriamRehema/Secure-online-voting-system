@@ -5,9 +5,10 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const AuditLog = require("../models/AuditLog");
+const logAudit = require("../utils/logAudit");
 
 const Vote = require("../models/Vote");
+
 const protectAdmin = require("../middlewares/authMiddleware");
 
 const Election = require("../models/Election");
@@ -27,15 +28,18 @@ router.post("/students",protectAdmin , async (req, res) => {
   if (req.admin.role !== "mainAdmin") {
     return res.status(403).json({ message: "Only main admin can register students" });
   }
-  const { regNumber, fullName, email, course, year, faceDescriptor } = req.body;
+  const { regNumber, fullName, email, course, year, password, faceDescriptor } = req.body;
 
-  if (!regNumber || !fullName || !email || !course || !year || !faceDescriptor) {
+  if (!regNumber || !fullName || !email || !course || !year || !password|| !faceDescriptor) {
     return res.status(400).json({ message: "All fields required" });
   }
 
   try {
     const existing = await Student.findOne({ regNumber });
     if (existing) return res.status(400).json({ message: "Student already exists" });
+
+     // Hash the password using bcrypt
+    const hashedPassword = await bcrypt.hash(password, 10);  // Salt rounds = 10
 
     const encryptedFace = encryptDescriptor(JSON.stringify(faceDescriptor));
 
@@ -45,10 +49,12 @@ router.post("/students",protectAdmin , async (req, res) => {
       email,
       course,
       year,
+      password :hashedPassword,
       faceDescriptor: encryptedFace,
     });
     
-
+      const savedStudent = await student.save();  // Save the student to the database
+      //console.log("Student saved successfully:", savedStudent);
     logAudit("STUDENT_REGISTER", {
       userId: req.admin._id,
       userModel: "Admin",

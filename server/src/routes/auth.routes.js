@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 
 const Student = require("../models/Student");
 const Admin = require("../models/Admin");
-const logAudit = require("../utils/auditLogger");
+const logAudit = require("../utils/logAudit");
 
 
 // ==============================
@@ -67,6 +67,10 @@ router.post("/admin/login", async (req, res) => {
   try {
     const { regNumber, password } = req.body;
 
+    if (!regNumber || !password) {
+      return res.status(400).json({ message: "Missing credentials" });
+    }
+
     const admin = await Admin.findOne({ regNumber });
 
     if (!admin) {
@@ -78,7 +82,8 @@ router.post("/admin/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const isMatch = await bcrypt.compare(password, admin.password);
+    // ✅ USE MODEL METHOD
+    const isMatch = await admin.matchPassword(password);
 
     if (!isMatch) {
       logAudit("ADMIN_LOGIN_FAIL", {
@@ -109,6 +114,7 @@ router.post("/admin/login", async (req, res) => {
     });
 
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
