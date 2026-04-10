@@ -6,7 +6,7 @@ const Candidate = require("../models/Candidate");
 const Vote = require("../models/Vote");
 const Election = require("../models/Election");
 const Student = require("../models/Student");
-const logAudit = require("../utils/auditLogger");
+const logAudit = require("../utils/logAudit");
 //
 // CAST VOTE
 router.post("/", async (req, res) => {

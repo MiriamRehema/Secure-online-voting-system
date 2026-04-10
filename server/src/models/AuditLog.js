@@ -42,4 +42,6 @@ AuditLogSchema.index({ timestamp: -1 });
 AuditLogSchema.index({ action: 1 });
 AuditLogSchema.index({ userId: 1 });
 
-module.exports = mongoose.model('AuditLog', AuditLogSchema);
+
+const AuditLog= mongoose.model('AuditLog', AuditLogSchema);
+module.exports=AuditLog;

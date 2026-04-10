@@ -1,23 +1,20 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
-const Admin = require("./models/Admin"); // adjust path if needed
+const Admin = require("./models/Admin");
 
-mongoose.connect("mongodb://127.0.0.1:27017/secureOnlineVotingSystem", {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+mongoose.connect("mongodb://127.0.0.1:27017/secureOnlineVotingSystem");
 
 async function createAdmin() {
-  const hashedPassword = await bcrypt.hash("ADMIN123", 10);
+  await Admin.deleteMany(); // 🔥 optional: clear old broken data
 
   const admin = new Admin({
     regNumber: "admin001",
-    password: hashedPassword,
+    password: "ADMIN123", // 🔥 plain → will be hashed automatically
     role: "mainAdmin",
   });
 
   await admin.save();
-  console.log("Admin created!");
+
+  console.log("✅ Admin created successfully!");
   mongoose.disconnect();
 }
 
