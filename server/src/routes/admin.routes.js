@@ -6,7 +6,7 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const logAudit = require("../utils/logAudit");
-
+const AuditLog = require("../models/AuditLog");
 const Vote = require("../models/Vote");
 
 const protectAdmin = require("../middlewares/authMiddleware");
@@ -82,7 +82,7 @@ router.post("/elections", protectAdmin, async (req, res) => {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    const { title, description, startDate, endDate, allowedCourses } = req.body;
+    const { title, description, startDate, endDate, allowedVoterGroups } = req.body;
 
     if (new Date(endDate) <= new Date(startDate)) {
       return res.status(400).json({ message: "Invalid dates" });
@@ -93,8 +93,8 @@ router.post("/elections", protectAdmin, async (req, res) => {
       description,
       startDate,
       endDate,
-      allowedCourses,
-      status: "upcoming",
+      allowedVoterGroups,
+      status: "draft",
       createdBy: req.admin._id,
     });
 
@@ -135,11 +135,15 @@ router.get("/elections", protectAdmin, async (req, res) => {
 router.put("/elections/:id/status", protectAdmin, async (req, res) => {
   try {
     const { status } = req.body;
+     if (!status) {
+  return res.status(400).json({ message: "Status is required" });
+}
 
     const election = await Election.findById(req.params.id);
     if (!election) {
       return res.status(404).json({ message: "Election not found" });
     }
+   
 
     election.status = status;
     await election.save();
@@ -154,7 +158,9 @@ router.put("/elections/:id/status", protectAdmin, async (req, res) => {
 
     res.json(election);
   } catch (err) {
-    res.status(500).json({ message: "Error updating election" });
+    res.status(500).json({ message: "Error updating election" ,
+      error: err.message
+    });
   }
 });
 
@@ -229,7 +235,10 @@ router.get("/audit-logs", protectAdmin, async (req, res) => {
 
     res.json(logs);
   } catch (err) {
-    res.status(500).json({ message: "Error fetching logs" });
+    console.erroe("AUDIT LOG ERROR:",err)
+    res.status(500).json({ message: "Error fetching logs",
+      error: err.message
+     });
   }
 });
 
