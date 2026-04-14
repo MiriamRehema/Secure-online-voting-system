@@ -34,7 +34,7 @@ router.post("/", async (req, res) => {
   
     //  Check election
     const election = await Election.findById(tokenDoc.election);
-    if (!election.allowedCourses.includes(student.course))
+    if (!election.allowedVoterGroups.includes(student.course))
     if (!election || election.status !== "active") {
       return res.status(400).json({ message: "Election not active" });
     }
