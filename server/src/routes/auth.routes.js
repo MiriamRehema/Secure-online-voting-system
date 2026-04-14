@@ -42,6 +42,13 @@ router.post("/student/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    // ✅ CREATE TOKEN (NEW)
+    const token = jwt.sign(
+      { id: student._id, role: "student" },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
     logAudit("STUDENT_LOGIN_SUCCESS", {
       userId: student._id,
       userModel: "Student",
@@ -49,12 +56,15 @@ router.post("/student/login", async (req, res) => {
       status: "SUCCESS",
     });
 
+    // ✅ RETURN TOKEN
     res.json({
+      token,
       studentId: student._id,
       fullName: student.fullName,
     });
 
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
