@@ -235,7 +235,7 @@ router.get("/audit-logs", protectAdmin, async (req, res) => {
 
     res.json(logs);
   } catch (err) {
-    console.erroe("AUDIT LOG ERROR:",err)
+    console.error("AUDIT LOG ERROR:",err)
     res.status(500).json({ message: "Error fetching logs",
       error: err.message
      });
