@@ -70,7 +70,111 @@ router.post("/students",protectAdmin , async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
+// ==============================
+// 👥 GET ALL STUDENTS
+// ==============================
+router.get("/students", protectAdmin, async (req, res) => {
+  if (req.admin.role !== "mainAdmin") {
+  return res.status(403).json({ message: "Not allowed" });
+}
+  try {
+    const students = await Student.find()
+      .select("-password -faceDescriptor")
+      .sort({ createdAt: -1 });
 
+    res.json(students);
+  } catch (err) {
+    console.error("FETCH STUDENTS ERROR:", err);
+    res.status(500).json({ message: "Error fetching students" });
+  }
+});
+
+// ==============================
+// 👤 GET ONE STUDENT
+// ==============================
+router.get("/students/:id", protectAdmin, async (req, res) => {
+  if (req.admin.role !== "mainAdmin") {
+  return res.status(403).json({ message: "Not allowed" });
+}
+  try {
+    const student = await Student.findById(req.params.id)
+      .select("-password -faceDescriptor");
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    res.json(student);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching student" });
+  }
+});
+// ==============================
+// ✏️ UPDATE STUDENT
+// ==============================
+router.put("/students/:id", protectAdmin, async (req, res) => {
+  if (req.admin.role !== "mainAdmin") {
+  return res.status(403).json({ message: "Not allowed" });
+}
+  try {
+    const { fullName, email, course, year } = req.body;
+
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Update fields (only if provided)
+    if (fullName) student.fullName = fullName;
+    if (email) student.email = email;
+    if (course) student.course = course;
+    if (year) student.year = year;
+
+    await student.save();
+
+    logAudit("STUDENT_UPDATE", {
+      userId: req.admin._id,
+      userModel: "Admin",
+      details: { studentId: student._id },
+      ipAddress: req.ip,
+      status: "SUCCESS",
+    });
+
+    res.json({ message: "Student updated successfully", student });
+  } catch (err) {
+    console.error("UPDATE ERROR:", err);
+    res.status(500).json({ message: "Error updating student" });
+  }
+});
+// ==============================
+// 🗑️ DELETE STUDENT
+// ==============================
+router.delete("/students/:id", protectAdmin, async (req, res) => {
+  if (req.admin.role !== "mainAdmin") {
+  return res.status(403).json({ message: "Not allowed" });
+}
+  try {
+    const student = await Student.findByIdAndDelete(req.params.id);
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    
+
+    logAudit("STUDENT_DELETE", {
+      userId: req.admin._id,
+      userModel: "Admin",
+      details: { studentId: student._id },
+      ipAddress: req.ip,
+      status: "SUCCESS",
+    });
+
+    res.json({ message: "Student deleted successfully" });
+  } catch (err) {
+    console.error("DELETE ERROR:", err);
+    res.status(500).json({ message: "Error deleting student" });
+  }
+});
 
 
 // ==============================
@@ -239,6 +343,19 @@ router.get("/audit-logs", protectAdmin, async (req, res) => {
     res.status(500).json({ message: "Error fetching logs",
       error: err.message
      });
+  }
+});
+router.get("/profile", protectAdmin, async (req, res) => {
+  try {
+    const admin = req.admin;
+
+    res.json({
+      _id: admin._id,
+     
+      role: admin.role
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching admin profile" });
   }
 });
 
