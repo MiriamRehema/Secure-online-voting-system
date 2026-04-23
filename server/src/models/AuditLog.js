@@ -9,12 +9,12 @@ const AuditLogSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId, // Can reference Voter or Admin model
     refPath: 'userModel',
-    // required: false, // Not always applicable (e.g., system events)
+   
   },
   userModel: {
     type: String,
     // required: function() { return !!this.userId; }, // Required if userId is present
-    enum: ['Voter', 'Admin'],
+    enum: ['Student', 'Admin'],
   },
   action: {
     type: String,
@@ -24,7 +24,7 @@ const AuditLogSchema = new mongoose.Schema({
   },
   details: {
     type: mongoose.Schema.Types.Mixed, // Flexible field for various details
-    // Example: { nationalID: '123', reason: 'Invalid credentials', voterId: 'xyz', candidateId: 'abc', adminUsername: 'adminX', modifiedField: 'voterStatus' }
+   
   },
   ipAddress: {
     type: String,
