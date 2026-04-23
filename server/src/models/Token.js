@@ -21,8 +21,9 @@ const tokenSchema = new mongoose.Schema({
   expiresAt:Date
 });
 tokenSchema.index(
-  { student: 1, election: 1 },
-  { unique: true }
+  { token: 1},
+  { unique: true },
+  { expiresAt: 1 }, { expireAfterSeconds: 0 }
 );
 
 module.exports = mongoose.model("Token", tokenSchema);
