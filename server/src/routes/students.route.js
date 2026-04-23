@@ -2,11 +2,11 @@ const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
 
-const Student = require("../models/Student");
+//const Student = require("../models/Student");
 const Election = require("../models/Election");
 const Vote = require("../models/Vote");
 const Token = require("../models/Token");
-
+//const AuditLog = require("../models/AuditLog");
 const { decryptDescriptor } = require("../utils/crypto");
 const protectStudent = require("../middlewares/protectStudent");
 const logAudit = require("../utils/logAudit");
@@ -38,10 +38,10 @@ router.post("/verify-face", protectStudent, async (req, res) => {
       return res.status(404).json({ message: "No active election" });
     }
 
-    // 🚫 Check voter eligibility
-    if (!election.allowedVoterGroups.includes(student.course)) {
-      return res.status(403).json({ message: "Not allowed to vote" });
-    }
+    // Check voter eligibility
+    // if (!election.allowedVoterGroups.includes(student.course)) {
+    //   return res.status(403).json({ message: "Not allowed to vote" });
+    // }
 
     // 🛑 Prevent double voting
     const alreadyVoted = await Vote.findOne({
@@ -78,6 +78,7 @@ router.post("/verify-face", protectStudent, async (req, res) => {
       student: student._id,
       election: election._id,
       used: false,
+      expiresAt: { $gt: new Date() }
     });
 
     if (existingToken && existingToken.expiresAt > new Date()) {
@@ -94,7 +95,8 @@ router.post("/verify-face", protectStudent, async (req, res) => {
       token: tokenString,
       student: student._id,
       election: election._id,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 mins
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 mins
+      
     });
 
     logAudit("FACE_VERIFICATION_SUCCESS", {
