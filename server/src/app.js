@@ -10,10 +10,11 @@ app.use(express.json());
 
 // Routes
 app.use("/api/auth", require("./routes/auth.routes"));
-app.use("/api/students", require("./routes/students.route"));
+app.use("/api/student", require("./routes/students.route"));
 app.use("/api/candidates", require("./routes/candidates.route"));
 app.use("/api/admin", require("./routes/admin.routes"));
-app.use("/api/votes", require("./routes/vote.routes"));
+app.use("/api/vote", require("./routes/vote.routes"));
+
 
 
 // Test route
