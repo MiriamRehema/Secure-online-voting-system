@@ -5,11 +5,11 @@ const Token = require("../models/Token");
 const Candidate = require("../models/Candidate");
 const Vote = require("../models/Vote");
 const Election = require("../models/Election");
-const Student = require("../models/Student");
+const protectStudent = require("../middlewares/protectStudent");
 const logAudit = require("../utils/logAudit");
 //
 // CAST VOTE
-router.post("/", async (req, res) => {
+router.post("/",protectStudent, async (req, res) => {
   const { token, candidateId } = req.body;
 
   if (!token || !candidateId)
@@ -17,27 +17,33 @@ router.post("/", async (req, res) => {
 
   try {
     const tokenDoc = await Token.findOne({ token });
-
+    if (!tokenDoc.student.equals(req.student._id)) {
+     return res.status(403).json({ message: "Token does not belong to user" });
+    }
+    // if (tokenDoc.userAgent !== req.headers["user-agent"]) {
+    // return res.status(403).json({ message: "Invalid session" });
+    // }
     if (!tokenDoc)
       return res.status(403).json({ message: "Invalid token" });
 
     if (tokenDoc.used)
       return res.status(403).json({ message: "Token already used" });
     if (tokenDoc.expiresAt < new Date()) 
+    
       return res.status(403).json({ message: "Token expired" });
+        console.log("Now:", new Date());
+      //console.log("ExpiresAt:", tokenDoc.expiresAt);
     
     //get student
-    const student = await Student.findById(tokenDoc.student);
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
+    const student = req.student;
   
     //  Check election
     const election = await Election.findById(tokenDoc.election);
-    if (!election.allowedVoterGroups.includes(student.course))
+   
     if (!election || election.status !== "active") {
       return res.status(400).json({ message: "Election not active" });
     }
+
     //  Candidate validation
     const candidate = await Candidate.findById(candidateId);
     if (!candidate || !candidate.election.equals(election._id)) {
@@ -52,8 +58,9 @@ router.post("/", async (req, res) => {
     if (alreadyVoted) {
       return res.status(400).json({ message: "Already voted" });
     }
-    if (new Date() < election.startDate || new Date() > election.endDate)
-    // ✅ Record vote
+   if (new Date() < election.startDate || new Date() > election.endDate) {
+  return res.status(400).json({ message: "Voting period closed" });
+}//  Save vote
     await Vote.create({
       student: student._id,
       candidate: candidate._id,
@@ -61,7 +68,7 @@ router.post("/", async (req, res) => {
       token: tokenDoc.token,
     });
 
-    // 📊 Increment vote count
+    //  Increment vote count
     candidate.voteCount += 1;
     await candidate.save();
 
