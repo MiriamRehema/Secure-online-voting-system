@@ -12,9 +12,9 @@ dotenv.config({
 
 const connectDB = require("./src/config/db");
 const app = require("./src/app");   // ✅ Import app FIRST
-const cors = require("cors");       // Then require cors
+      // Then require cors
 
-app.use(cors());                    // ✅ Now app exists
+                  // ✅ Now app exists
 
 const mongoUri = process.env.MONGODB_URI;
 
@@ -27,3 +27,5 @@ connectDB(mongoUri)
     );
   })
   .catch((err) => console.error(err));
+
+

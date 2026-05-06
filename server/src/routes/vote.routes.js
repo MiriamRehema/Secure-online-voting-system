@@ -7,49 +7,73 @@ const Vote = require("../models/Vote");
 const Election = require("../models/Election");
 const protectStudent = require("../middlewares/protectStudent");
 const logAudit = require("../utils/logAudit");
-//
-// CAST VOTE
-router.post("/",protectStudent, async (req, res) => {
+
+// 🗳️ CAST VOTE
+router.post("/", protectStudent, async (req, res) => {
   const { token, candidateId } = req.body;
 
-  if (!token || !candidateId)
+  if (!token || !candidateId) {
     return res.status(400).json({ message: "Token and candidate required" });
+  }
 
   try {
+    // 🔍 Find token
     const tokenDoc = await Token.findOne({ token });
-    if (!tokenDoc.student.equals(req.student._id)) {
-     return res.status(403).json({ message: "Token does not belong to user" });
-    }
-    // if (tokenDoc.userAgent !== req.headers["user-agent"]) {
-    // return res.status(403).json({ message: "Invalid session" });
-    // }
-    if (!tokenDoc)
-      return res.status(403).json({ message: "Invalid token" });
 
-    if (tokenDoc.used)
+    if (!tokenDoc) {
+      return res.status(403).json({ message: "Invalid token" });
+    }
+
+    // 🔐 Check ownership
+    if (!tokenDoc.student.equals(req.student._id)) {
+      return res.status(403).json({ message: "Token does not belong to user" });
+    }
+
+    // ⛔ Check if used
+    if (tokenDoc.used) {
       return res.status(403).json({ message: "Token already used" });
-    if (tokenDoc.expiresAt < new Date()) 
-    
+    }
+
+    // ⏳ Check expiry
+    if (tokenDoc.expiresAt < new Date()) {
       return res.status(403).json({ message: "Token expired" });
-        console.log("Now:", new Date());
-      //console.log("ExpiresAt:", tokenDoc.expiresAt);
-    
-    //get student
+    }
+
+    console.log("Now:", new Date());
+    console.log("ExpiresAt:", tokenDoc.expiresAt);
+
     const student = req.student;
-  
-    //  Check election
+
+    // 🗳️ Check election
     const election = await Election.findById(tokenDoc.election);
-   
+
     if (!election || election.status !== "active") {
       return res.status(400).json({ message: "Election not active" });
     }
 
-    //  Candidate validation
+    // ⏱️ Check voting window
+    // if (new Date() < election.startDate || new Date() > election.endDate) {
+    //   return res.status(400).json({ message: "Voting period closed" });
+    // }
+
+    // 🎯 Validate candidate
     const candidate = await Candidate.findById(candidateId);
-    if (!candidate || !candidate.election.equals(election._id)) {
+
+      if (!candidate) {
       return res.status(400).json({ message: "Invalid candidate" });
-    }
-    //  Prevent double voting (extra safety)
+      }
+
+//  ensure election exists on candidate
+       if (!candidate.election) {
+       return res.status(400).json({ message: "Candidate not linked to election" });
+       }
+
+// 🔒 compare safely
+    if (candidate.election.toString() !== election._id.toString()) {
+      return res.status(400).json({ message: "Candidate does not belong to this election" });
+      }
+
+    // 🚫 Prevent double voting
     const alreadyVoted = await Vote.findOne({
       student: student._id,
       election: election._id,
@@ -58,25 +82,25 @@ router.post("/",protectStudent, async (req, res) => {
     if (alreadyVoted) {
       return res.status(400).json({ message: "Already voted" });
     }
-   if (new Date() < election.startDate || new Date() > election.endDate) {
-  return res.status(400).json({ message: "Voting period closed" });
-}//  Save vote
+
+    // ✅ Save vote
     await Vote.create({
       student: student._id,
-      candidate: candidate._id,
+      candidateId: candidate._id,
       election: election._id,
       token: tokenDoc.token,
     });
 
-    //  Increment vote count
-    candidate.voteCount += 1;
-    await candidate.save();
+    // 🔢 Increment vote count (safe way)
+    await Candidate.findByIdAndUpdate(candidateId, {
+      $inc: { voteCount: 1 },
+    });
 
     // 🔒 Mark token used
     tokenDoc.used = true;
     await tokenDoc.save();
 
-    //  Audit log
+    // 📝 Audit log
     logAudit("VOTE_CAST", {
       userId: student._id,
       userModel: "Student",
@@ -87,9 +111,6 @@ router.post("/",protectStudent, async (req, res) => {
 
     return res.json({ message: "Vote cast successfully" });
 
-
-
-   
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server Error" });

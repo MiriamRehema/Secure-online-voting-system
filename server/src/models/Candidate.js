@@ -24,7 +24,12 @@ const candidateSchema = new mongoose.Schema({
   isActive:{
     type:Boolean,
     default:true
-  }
+  },
+   election: {   
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Election",
+    required: true
+  },
 });
 
 
