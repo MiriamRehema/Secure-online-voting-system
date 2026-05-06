@@ -28,20 +28,11 @@ router.post("/verify-face", protectStudent, async (req, res) => {
     const { faceDescriptor } = req.body;
     const student = req.student;
 
-    if (!faceDescriptor || !Array.isArray(faceDescriptor)) {
-      return res.status(400).json({ message: "Valid face data required" });
-    }
-
-    // 🔍 Get active election
+    // 🔍 Get active election (needed for both DEV & PROD)
     const election = await Election.findOne({ status: "active" });
     if (!election) {
       return res.status(404).json({ message: "No active election" });
     }
-
-    // Check voter eligibility
-    // if (!election.allowedVoterGroups.includes(student.course)) {
-    //   return res.status(403).json({ message: "Not allowed to vote" });
-    // }
 
     // 🛑 Prevent double voting
     const alreadyVoted = await Vote.findOne({
@@ -51,6 +42,50 @@ router.post("/verify-face", protectStudent, async (req, res) => {
 
     if (alreadyVoted) {
       return res.status(400).json({ message: "Already voted" });
+    }
+
+    // =====================================================
+    // 🔥 DEV MODE BYPASS (NO FACE CHECK)
+    // =====================================================
+    if (process.env.DEV_MODE === "true") {
+
+      // 🔑 Check existing valid token
+      let existingToken = await Token.findOne({
+        student: student._id,
+        election: election._id,
+        used: false,
+        expiresAt: { $gt: new Date() }
+      });
+
+      if (existingToken) {
+        return res.json({
+          verified: true,
+          token: existingToken.token,
+        });
+      }
+
+      // 🆕 Create token
+      const tokenString = crypto.randomBytes(32).toString("hex");
+
+      const newToken = await Token.create({
+        token: tokenString,
+        student: student._id,
+        election: election._id,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      });
+
+      return res.json({
+        verified: true,
+        token: newToken.token,
+      });
+    }
+
+    // =====================================================
+    // 🧠 NORMAL FACE VERIFICATION (PRODUCTION)
+    // =====================================================
+
+    if (!faceDescriptor || !Array.isArray(faceDescriptor)) {
+      return res.status(400).json({ message: "Valid face data required" });
     }
 
     // 🔐 Decrypt stored face descriptor
@@ -81,22 +116,21 @@ router.post("/verify-face", protectStudent, async (req, res) => {
       expiresAt: { $gt: new Date() }
     });
 
-    if (existingToken && existingToken.expiresAt > new Date()) {
+    if (existingToken) {
       return res.json({
         verified: true,
         token: existingToken.token,
       });
     }
 
-    // 🆕 Create new voting token
+    // 🆕 Create new token
     const tokenString = crypto.randomBytes(32).toString("hex");
 
     const newToken = await Token.create({
       token: tokenString,
       student: student._id,
       election: election._id,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 mins
-      
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
     });
 
     logAudit("FACE_VERIFICATION_SUCCESS", {
@@ -119,6 +153,7 @@ router.post("/verify-face", protectStudent, async (req, res) => {
       error: err.message,
     });
   }
+
 });
 
 // ==============================
@@ -136,6 +171,56 @@ router.get("/active-election", protectStudent, async (req, res) => {
     res.json(election);
   } catch (err) {
     res.status(500).json({ message: "Error fetching election" });
+  }
+});
+// ==============================
+// 🗳️ CHECK VOTING STATUS
+// ==============================
+router.get("/voting-status", protectStudent, async (req, res) => {
+  try {
+    const student = req.student;
+
+    // 🔍 Get active election
+    const election = await Election.findOne({ status: "active" });
+
+    if (!election) {
+      return res.status(404).json({ message: "No active election" });
+    }
+
+    // 🔍 Check if student has voted
+    const vote = await Vote.findOne({
+      student: student._id,
+      election: election._id,
+    }).populate({
+  path: "candidateId",
+  select: "name party position"
+});
+
+    if (vote) {
+      return res.json({
+        hasVoted: true,
+        message: "Student has already voted",
+        voteId: vote._id,
+        candidate: {
+          id: vote.candidateId._id,
+          name: vote.candidateId.name,
+          party: vote.candidateId.party,
+          position: vote.candidateId.position,
+        },
+        
+      });
+      console.log(vote);
+    }
+    
+
+    return res.json({
+      hasVoted: false,
+      message: "Student has not voted yet",
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 

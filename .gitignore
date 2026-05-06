@@ -1,4 +1,7 @@
 .env
+server/.env
 .env.test
 node_modules
 *.log
+ngrok*
+*.zip

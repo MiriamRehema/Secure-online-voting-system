@@ -280,6 +280,9 @@ router.post("/elections/:id/candidates", protectAdmin, async (req, res) => {
     if (!election) {
       return res.status(404).json({ message: "Election not found" });
     }
+    if (!name || !position) {
+     return res.status(400).json({ message: "Name and position required" });
+    }
 
     const candidate = await Candidate.create({
       name,
@@ -302,6 +305,79 @@ router.post("/elections/:id/candidates", protectAdmin, async (req, res) => {
     res.status(201).json(candidate);
   } catch (err) {
     res.status(500).json({ message: "Error adding candidate" });
+  }
+});
+// 🏆 GET ELECTION RESULTS
+router.get("/elections/:id/results", protectAdmin, async (req, res) => {
+  try {
+    const election = await Election.findById(req.params.id);
+
+    if (!election) {
+      return res.status(404).json({ message: "Election not found" });
+    }
+
+    // 🔍 Get all candidates for this election
+    const candidates = await Candidate.find({
+      election: election._id,
+    }).select("name party position voteCount");
+
+    // 📊 Sort by votes (highest first)
+    candidates.sort((a, b) => b.voteCount - a.voteCount);
+
+    const totalVotes = candidates.reduce(
+      (sum, c) => sum + c.voteCount,
+      0
+    );
+
+    return res.json({
+      election: {
+        id: election._id,
+        title: election.title,
+        status: election.status,
+      },
+      totalVotes,
+      results: candidates,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});// 🏆 GET ELECTION RESULTS
+router.get("/elections/:id/results", protectAdmin, async (req, res) => {
+  try {
+    const election = await Election.findById(req.params.id);
+
+    if (!election) {
+      return res.status(404).json({ message: "Election not found" });
+    }
+
+    // 🔍 Get all candidates for this election
+    const candidates = await Candidate.find({
+      election: election._id,
+    }).select("name party position voteCount");
+
+    // 📊 Sort by votes (highest first)
+    candidates.sort((a, b) => b.voteCount - a.voteCount);
+
+    const totalVotes = candidates.reduce(
+      (sum, c) => sum + c.voteCount,
+      0
+    );
+
+    return res.json({
+      election: {
+        id: election._id,
+        title: election.title,
+        status: election.status,
+      },
+      totalVotes,
+      results: candidates,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
