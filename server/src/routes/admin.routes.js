@@ -10,6 +10,7 @@ const AuditLog = require("../models/AuditLog");
 const Vote = require("../models/Vote");
 
 const protectAdmin = require("../middlewares/authMiddleware");
+// console.log('protectAdmin loaded:', typeof protectAdmin);
 
 const Election = require("../models/Election");
 const Student = require("../models/Student");
