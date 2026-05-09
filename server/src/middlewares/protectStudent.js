@@ -2,6 +2,8 @@ const jwt = require("jsonwebtoken");
 const Student = require("../models/Student");
 
 const protectStudent = async (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   let token;
 
   if (req.headers.authorization?.startsWith("Bearer")) {
