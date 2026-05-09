@@ -121,7 +121,11 @@ router.post("/admin/login", async (req, res) => {
     res.json({
       token,
       role: admin.role,
-    });
+      adminId: admin._id,
+      redirect: "/admin/dashboard"
+    }
+    
+  );
 
   } catch (err) {
     console.error(err);
