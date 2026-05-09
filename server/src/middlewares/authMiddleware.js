@@ -1,29 +1,52 @@
 const jwt = require("jsonwebtoken");
 const Admin = require("../models/Admin");
 
-// Middleware to protect admin routes
 const protectAdmin = async (req, res, next) => {
-  let token;
+  console.log("protectAdmin hit!");
+//   if (req.method === "OPTIONS") {
+//   return res.sendStatus(204);
+// }
+  
+  
+  // res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  // res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   try {
-    // Get token from headers
-    if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-      token = req.headers.authorization.split(" ")[1];
+    const authHeader = req.headers.authorization;
+    console.log("AUTH HEADER:", authHeader);
 
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Attach admin to request
-      req.admin = await Admin.findById(decoded.id).select("-password");
-      if (!req.admin) return res.status(401).json({ message: "Admin not found" });
-
-      next();
-    } else {
+    // 1. Check if header exists and is correct
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "Not authorized, token missing" });
     }
+
+    // 2. Extract token ONLY (remove "Bearer ")
+    const token = authHeader.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({ message: "Token missing after split" });
+    }
+
+    // 3. Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // 4. Fetch admin
+    const admin = await Admin.findById(decoded.id).select("-password");
+
+    if (!admin) {
+      return res.status(401).json({ message: "Admin not found" });
+    }
+
+    req.admin = admin;
+
+    next();
   } catch (err) {
-    console.error(err);
-    res.status(401).json({ message: "Not authorized, token failed" });
+    console.error("JWT ERROR:", err.message);
+
+    return res.status(401).json({
+      message: "Not authorized, token failed",
+      error: err.message,
+    });
   }
 };
 
