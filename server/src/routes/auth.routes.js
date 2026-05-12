@@ -9,63 +9,92 @@ const logAudit = require("../utils/logAudit");
 
 
 // ==============================
-// 👨‍🎓 STUDENT LOGIN
+// 👨‍🎓 STUDENT LOGIN (FIXED)
 // ==============================
 router.post("/student/login", async (req, res) => {
   try {
-    const { regNumber, password } = req.body;
+    let { regNumber, password } = req.body;
 
     if (!regNumber || !password) {
-      return res.status(400).json({ message: "Missing credentials" });
+      return res.status(400).json({
+        message: "Missing credentials",
+      });
     }
+   
+    
 
+    // ✅ NORMALIZATION (VERY IMPORTANT)
+    regNumber = regNumber.trim().toLowerCase();
+     console.log("LOGIN REGNUMBER:", regNumber);
     const student = await Student.findOne({ regNumber });
-
+    console.log("STUDENT FOUND:", student);
     if (!student) {
-      logAudit("STUDENT_LOGIN_FAIL", {
+      await logAudit("STUDENT_LOGIN_FAIL", {
         details: { regNumber },
         ipAddress: req.ip,
         status: "FAILURE",
       });
-      return res.status(401).json({ message: "Invalid credentials" });
+
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
     }
 
+    // 🔐 CHECK PASSWORD
     const isMatch = await bcrypt.compare(password, student.password);
+    console.log("INPUT PASSWORD:", password);
+      console.log("DB HASH:", student.password);
+     //console.log("MATCH RESULT:", await bcrypt.compare(password, student.password));
+     
+     
+     const test = await bcrypt.compare(password, student.password);
+      console.log("BCRYPT DIRECT TEST:", test);
+     // console.log(bcrypt.compareSync("Password@123", "$2b$10$GDpuUGhJHBpkS/LwjlUpa.GTDDiwslF1Frv.u1jBMffH.P0W2CEMq")
+
+
 
     if (!isMatch) {
-      logAudit("STUDENT_LOGIN_FAIL", {
+      await logAudit("STUDENT_LOGIN_FAIL", {
         userId: student._id,
         userModel: "Student",
         ipAddress: req.ip,
         status: "FAILURE",
       });
-      return res.status(401).json({ message: "Invalid credentials" });
+
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
     }
 
-    // ✅ CREATE TOKEN (NEW)
+    // 🔑 GENERATE TOKEN
     const token = jwt.sign(
-      { id: student._id, role: "student" },
+      {
+        id: student._id,
+        role: "student",
+      },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
-    logAudit("STUDENT_LOGIN_SUCCESS", {
+    await logAudit("STUDENT_LOGIN_SUCCESS", {
       userId: student._id,
       userModel: "Student",
       ipAddress: req.ip,
       status: "SUCCESS",
     });
 
-    // ✅ RETURN TOKEN
-    res.json({
+    return res.json({
       token,
       studentId: student._id,
       fullName: student.fullName,
+      regNumber: student.regNumber,
     });
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({
+      message: "Server error",
+    });
   }
 });
 
