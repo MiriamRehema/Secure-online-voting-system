@@ -19,44 +19,85 @@ const Candidate = require("../models/Candidate");
 const { encryptDescriptor } = require("../utils/crypto");
 
 
+//create student
 
+router.post("/students", protectAdmin, async (req, res) => {
 
-// 1️⃣ ADMIN REGISTERS STUDENT
-// ==============================
-
-
-router.post("/students",protectAdmin , async (req, res) => {
   if (req.admin.role !== "mainAdmin") {
-    return res.status(403).json({ message: "Only main admin can register students" });
-  }
-  const { regNumber, fullName, email, course, year, password, faceDescriptor } = req.body;
-
-  if (!regNumber || !fullName || !email || !course || !year || !password|| !faceDescriptor) {
-    return res.status(400).json({ message: "All fields required" });
+    return res.status(403).json({
+      message: "Only main admin can register students",
+    });
   }
 
   try {
-    const existing = await Student.findOne({ regNumber });
-    if (existing) return res.status(400).json({ message: "Student already exists" });
-
-     // Hash the password using bcrypt
-    const hashedPassword = await bcrypt.hash(password, 10);  // Salt rounds = 10
-
-    const encryptedFace = encryptDescriptor(JSON.stringify(faceDescriptor));
-
-    const student = new Student({
+    let {
       regNumber,
       fullName,
       email,
       course,
       year,
-      password :hashedPassword,
+      password,
+      faceDescriptor,
+    } = req.body;
+
+    // =========================
+    // 🧠 NORMALIZATION (IMPORTANT)
+    // =========================
+    regNumber = regNumber.trim().toLowerCase();
+
+    if (
+      !regNumber ||
+      !fullName ||
+      !email ||
+      !course ||
+      !year ||
+      !password ||
+      !faceDescriptor
+    ) {
+      return res.status(400).json({
+        message: "All fields required",
+      });
+    }
+
+    // =========================
+    // CHECK EXISTING STUDENT
+    // =========================
+    const existing = await Student.findOne({ regNumber });
+
+    if (existing) {
+      return res.status(400).json({
+        message: "Student already exists",
+      });
+    }
+
+    
+
+    // =========================
+    // ENCRYPT FACE
+    // =========================
+    const encryptedFace = encryptDescriptor(
+      JSON.stringify(faceDescriptor)
+    );
+
+    // =========================
+    // CREATE STUDENT
+    // =========================
+    const student = new Student({
+      regNumber, // ✅ normalized value
+      fullName,
+      email,
+      course,
+      year,
+      password:password,
       faceDescriptor: encryptedFace,
     });
-    
-      const savedStudent = await student.save();  // Save the student to the database
-      //console.log("Student saved successfully:", savedStudent);
-    logAudit("STUDENT_REGISTER", {
+
+    await student.save();
+
+    // =========================
+    // AUDIT LOG
+    // =========================
+    await logAudit("STUDENT_REGISTER", {
       userId: req.admin._id,
       userModel: "Admin",
       details: { studentId: student._id },
@@ -64,20 +105,19 @@ router.post("/students",protectAdmin , async (req, res) => {
       status: "SUCCESS",
     });
 
-    
-    res.status(201).json({ message: "Student registered successfully" });
+    res.status(201).json({
+      message: "Student registered successfully",
+    });
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server Error" });
+    res.status(500).json({
+      message: "Server Error",
+    });
   }
 });
-// ==============================
-// 👥 GET ALL STUDENTS
-// ==============================
+//get all students
 router.get("/students", protectAdmin, async (req, res) => {
-  if (req.admin.role !== "mainAdmin") {
-  return res.status(403).json({ message: "Not allowed" });
-}
   try {
     const students = await Student.find()
       .select("-password -faceDescriptor")
@@ -85,7 +125,6 @@ router.get("/students", protectAdmin, async (req, res) => {
 
     res.json(students);
   } catch (err) {
-    console.error("FETCH STUDENTS ERROR:", err);
     res.status(500).json({ message: "Error fetching students" });
   }
 });
