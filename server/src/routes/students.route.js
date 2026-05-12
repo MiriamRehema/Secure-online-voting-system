@@ -6,7 +6,7 @@ const crypto = require("crypto");
 const Election = require("../models/Election");
 const Vote = require("../models/Vote");
 const Token = require("../models/Token");
-//const AuditLog = require("../models/AuditLog");
+
 const { decryptDescriptor } = require("../utils/crypto");
 const protectStudent = require("../middlewares/protectStudent");
 const logAudit = require("../utils/logAudit");
@@ -20,142 +20,160 @@ function calculateDistance(desc1, desc2) {
   );
 }
 
-// ==============================
-// 📸 VERIFY FACE (SECURE)
-// ==============================
+
 router.post("/verify-face", protectStudent, async (req, res) => {
   try {
     const { faceDescriptor } = req.body;
     const student = req.student;
 
-    // 🔍 Get active election (needed for both DEV & PROD)
-    const election = await Election.findOne({ status: "active" });
-    if (!election) {
-      return res.status(404).json({ message: "No active election" });
+    // ==============================
+    // VALIDATE INPUT
+    // ==============================
+    if (
+      !faceDescriptor ||
+      !Array.isArray(faceDescriptor) ||
+      faceDescriptor.length !== 128
+    ) {
+      return res.status(400).json({
+        message: "Invalid face descriptor",
+      });
     }
 
-    // 🛑 Prevent double voting
+    // ==============================
+    // CHECK ACTIVE ELECTION
+    // ==============================
+    const election = await Election.findOne({
+      status: "active",
+    });
+
+    if (!election) {
+      return res.status(404).json({
+        message: "No active election",
+      });
+    }
+
+    // ==============================
+    // PREVENT DOUBLE VOTING
+    // ==============================
     const alreadyVoted = await Vote.findOne({
       student: student._id,
       election: election._id,
     });
 
-    if (alreadyVoted) {
-      return res.status(400).json({ message: "Already voted" });
-    }
-
-    // =====================================================
-    // 🔥 DEV MODE BYPASS (NO FACE CHECK)
-    // =====================================================
-    if (process.env.DEV_MODE === "true") {
-
-      // 🔑 Check existing valid token
-      let existingToken = await Token.findOne({
-        student: student._id,
-        election: election._id,
-        used: false,
-        expiresAt: { $gt: new Date() }
-      });
-
-      if (existingToken) {
-        return res.json({
-          verified: true,
-          token: existingToken.token,
-        });
-      }
-
-      // 🆕 Create token
-      const tokenString = crypto.randomBytes(32).toString("hex");
-
-      const newToken = await Token.create({
-        token: tokenString,
-        student: student._id,
-        election: election._id,
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-      });
-
-      return res.json({
-        verified: true,
-        token: newToken.token,
+    if (alreadyVoted || student.hasVoted) {
+      return res.status(403).json({
+        message: "You have already voted",
       });
     }
 
-    // =====================================================
-    // 🧠 NORMAL FACE VERIFICATION (PRODUCTION)
-    // =====================================================
-
-    if (!faceDescriptor || !Array.isArray(faceDescriptor)) {
-      return res.status(400).json({ message: "Valid face data required" });
+    // ==============================
+    // CHECK REGISTERED FACE
+    // ==============================
+    if (!student.faceDescriptor) {
+      return res.status(400).json({
+        message: "No registered facial data found",
+      });
     }
 
-    // 🔐 Decrypt stored face descriptor
-    const decryptedDescriptor = JSON.parse(
+    // ==============================
+    // DECRYPT STORED FACE
+    // ==============================
+    const storedDescriptor = JSON.parse(
       decryptDescriptor(student.faceDescriptor)
     );
 
-    // 🧠 Compare faces
-    const distance = calculateDistance(decryptedDescriptor, faceDescriptor);
-    const THRESHOLD = process.env.FACE_THRESHOLD || 0.6;
+    // ==============================
+    // COMPARE FACE DISTANCE
+    // ==============================
+    const distance = calculateDistance(
+      storedDescriptor,
+      faceDescriptor
+    );
 
-    if (distance >= THRESHOLD) {
-      logAudit("FACE_VERIFICATION_FAIL", {
+    const THRESHOLD = Number(process.env.FACE_THRESHOLD) || 0.45;
+
+    console.log("FACE DISTANCE:", distance);
+
+    // Lower distance = better match
+    if (distance > THRESHOLD) {
+
+      await logAudit("FACE_VERIFICATION_FAILED", {
         userId: student._id,
         userModel: "Student",
         ipAddress: req.ip,
         status: "FAILURE",
+        details: {
+          distance,
+        },
       });
 
-      return res.status(401).json({ verified: false });
+      return res.status(401).json({
+        verified: false,
+        message: "Face verification failed",
+      });
     }
 
-    // 🔑 Check existing valid token
-    let existingToken = await Token.findOne({
+    // ==============================
+    // REMOVE OLD TOKENS
+    // ==============================
+    await Token.deleteMany({
+      student: student._id,
+      election: election._id,
+    });
+
+    // ==============================
+    // CREATE SECURE VOTING TOKEN
+    // ==============================
+    const votingToken = crypto
+      .randomBytes(32)
+      .toString("hex");
+
+    const expiresAt = new Date(
+      Date.now() + 15 * 60 * 1000
+    );
+
+    await Token.create({
+      token: votingToken,
       student: student._id,
       election: election._id,
       used: false,
-      expiresAt: { $gt: new Date() }
+      expiresAt,
     });
 
-    if (existingToken) {
-      return res.json({
-        verified: true,
-        token: existingToken.token,
-      });
-    }
+    // Optional:
+    student.votingToken = votingToken;
+    await student.save();
 
-    // 🆕 Create new token
-    const tokenString = crypto.randomBytes(32).toString("hex");
-
-    const newToken = await Token.create({
-      token: tokenString,
-      student: student._id,
-      election: election._id,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-    });
-
-    logAudit("FACE_VERIFICATION_SUCCESS", {
+    // ==============================
+    // AUDIT SUCCESS
+    // ==============================
+    await logAudit("FACE_VERIFICATION_SUCCESS", {
       userId: student._id,
       userModel: "Student",
-      details: { electionId: election._id },
       ipAddress: req.ip,
       status: "SUCCESS",
+      details: {
+        electionId: election._id,
+      },
     });
 
-    return res.json({
+    // ==============================
+    // RESPONSE
+    // ==============================
+    return res.status(200).json({
       verified: true,
-      token: newToken.token,
+      token: votingToken,
+      expiresAt,
     });
 
   } catch (err) {
     console.error("FACE VERIFY ERROR:", err);
-    res.status(500).json({
-      message: "Server error",
-      error: err.message,
+
+    return res.status(500).json({
+      message: "Internal server error",
     });
   }
-
 });
-
 // ==============================
 // 🗳️ GET ACTIVE ELECTION (for frontend)
 // ==============================
