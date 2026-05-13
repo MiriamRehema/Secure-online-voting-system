@@ -132,13 +132,16 @@ router.post("/verify-face", protectStudent, async (req, res) => {
       Date.now() + 15 * 60 * 1000
     );
 
-    await Token.create({
-      token: votingToken,
-      student: student._id,
-      election: election._id,
-      used: false,
-      expiresAt,
-    });
+   const tokenHash = crypto.createHash('sha256').update(votingToken).digest('hex');
+
+   await Token.create({
+    token: votingToken,
+    tokenHash,
+    student: student._id,
+    election: election._id,
+    used: false,
+    expiresAt,
+  });
 
     // Optional:
     student.votingToken = votingToken;
