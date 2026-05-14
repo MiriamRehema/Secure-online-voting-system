@@ -1,6 +1,3 @@
-
-
-
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
@@ -10,7 +7,6 @@ const AuditLog = require("../models/AuditLog");
 const Vote = require("../models/Vote");
 
 const protectAdmin = require("../middlewares/authMiddleware");
-// console.log('protectAdmin loaded:', typeof protectAdmin);
 
 const Election = require("../models/Election");
 const Student = require("../models/Student");
@@ -19,10 +15,10 @@ const Candidate = require("../models/Candidate");
 const { encryptDescriptor } = require("../utils/crypto");
 
 
-//create student
-
+// ==============================
+// 👨‍🎓 CREATE STUDENT
+// ==============================
 router.post("/students", protectAdmin, async (req, res) => {
-
   if (req.admin.role !== "mainAdmin") {
     return res.status(403).json({
       message: "Only main admin can register students",
@@ -40,63 +36,31 @@ router.post("/students", protectAdmin, async (req, res) => {
       faceDescriptor,
     } = req.body;
 
-    // =========================
-    // 🧠 NORMALIZATION (IMPORTANT)
-    // =========================
     regNumber = regNumber.trim().toLowerCase();
 
-    if (
-      !regNumber ||
-      !fullName ||
-      !email ||
-      !course ||
-      !year ||
-      !password ||
-      !faceDescriptor
-    ) {
-      return res.status(400).json({
-        message: "All fields required",
-      });
+    if (!regNumber || !fullName || !email || !course || !year || !password || !faceDescriptor) {
+      return res.status(400).json({ message: "All fields required" });
     }
 
-    // =========================
-    // CHECK EXISTING STUDENT
-    // =========================
     const existing = await Student.findOne({ regNumber });
-
     if (existing) {
-      return res.status(400).json({
-        message: "Student already exists",
-      });
+      return res.status(400).json({ message: "Student already exists" });
     }
 
-    
+    const encryptedFace = encryptDescriptor(JSON.stringify(faceDescriptor));
 
-    // =========================
-    // ENCRYPT FACE
-    // =========================
-    const encryptedFace = encryptDescriptor(
-      JSON.stringify(faceDescriptor)
-    );
-
-    // =========================
-    // CREATE STUDENT
-    // =========================
     const student = new Student({
-      regNumber, // ✅ normalized value
+      regNumber,
       fullName,
       email,
       course,
       year,
-      password:password,
+      password: password,
       faceDescriptor: encryptedFace,
     });
 
     await student.save();
 
-    // =========================
-    // AUDIT LOG
-    // =========================
     await logAudit("STUDENT_REGISTER", {
       userId: req.admin._id,
       userModel: "Admin",
@@ -105,18 +69,17 @@ router.post("/students", protectAdmin, async (req, res) => {
       status: "SUCCESS",
     });
 
-    res.status(201).json({
-      message: "Student registered successfully",
-    });
+    res.status(201).json({ message: "Student registered successfully" });
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({
-      message: "Server Error",
-    });
+    res.status(500).json({ message: "Server Error" });
   }
 });
-//get all students
+
+// ==============================
+// 📋 GET ALL STUDENTS
+// ==============================
 router.get("/students", protectAdmin, async (req, res) => {
   try {
     const students = await Student.find()
@@ -134,8 +97,8 @@ router.get("/students", protectAdmin, async (req, res) => {
 // ==============================
 router.get("/students/:id", protectAdmin, async (req, res) => {
   if (req.admin.role !== "mainAdmin") {
-  return res.status(403).json({ message: "Not allowed" });
-}
+    return res.status(403).json({ message: "Not allowed" });
+  }
   try {
     const student = await Student.findById(req.params.id)
       .select("-password -faceDescriptor");
@@ -149,13 +112,14 @@ router.get("/students/:id", protectAdmin, async (req, res) => {
     res.status(500).json({ message: "Error fetching student" });
   }
 });
+
 // ==============================
 // ✏️ UPDATE STUDENT
 // ==============================
 router.put("/students/:id", protectAdmin, async (req, res) => {
   if (req.admin.role !== "mainAdmin") {
-  return res.status(403).json({ message: "Not allowed" });
-}
+    return res.status(403).json({ message: "Not allowed" });
+  }
   try {
     const { fullName, email, course, year } = req.body;
 
@@ -164,7 +128,6 @@ router.put("/students/:id", protectAdmin, async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    // Update fields (only if provided)
     if (fullName) student.fullName = fullName;
     if (email) student.email = email;
     if (course) student.course = course;
@@ -186,20 +149,20 @@ router.put("/students/:id", protectAdmin, async (req, res) => {
     res.status(500).json({ message: "Error updating student" });
   }
 });
+
 // ==============================
 // 🗑️ DELETE STUDENT
 // ==============================
 router.delete("/students/:id", protectAdmin, async (req, res) => {
   if (req.admin.role !== "mainAdmin") {
-  return res.status(403).json({ message: "Not allowed" });
-}
+    return res.status(403).json({ message: "Not allowed" });
+  }
   try {
     const student = await Student.findByIdAndDelete(req.params.id);
 
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
-    
 
     logAudit("STUDENT_DELETE", {
       userId: req.admin._id,
@@ -215,7 +178,6 @@ router.delete("/students/:id", protectAdmin, async (req, res) => {
     res.status(500).json({ message: "Error deleting student" });
   }
 });
-
 
 // ==============================
 // 🗳️ CREATE ELECTION
@@ -256,7 +218,6 @@ router.post("/elections", protectAdmin, async (req, res) => {
   }
 });
 
-
 // ==============================
 // 📝 GET ALL ELECTIONS
 // ==============================
@@ -272,22 +233,20 @@ router.get("/elections", protectAdmin, async (req, res) => {
   }
 });
 
-
 // ==============================
 // 🔄 UPDATE ELECTION STATUS
 // ==============================
 router.put("/elections/:id/status", protectAdmin, async (req, res) => {
   try {
     const { status } = req.body;
-     if (!status) {
-  return res.status(400).json({ message: "Status is required" });
-}
+    if (!status) {
+      return res.status(400).json({ message: "Status is required" });
+    }
 
     const election = await Election.findById(req.params.id);
     if (!election) {
       return res.status(404).json({ message: "Election not found" });
     }
-   
 
     election.status = status;
     await election.save();
@@ -302,12 +261,9 @@ router.put("/elections/:id/status", protectAdmin, async (req, res) => {
 
     res.json(election);
   } catch (err) {
-    res.status(500).json({ message: "Error updating election" ,
-      error: err.message
-    });
+    res.status(500).json({ message: "Error updating election", error: err.message });
   }
 });
-
 
 // ==============================
 // 👤 ADD CANDIDATE
@@ -321,7 +277,7 @@ router.post("/elections/:id/candidates", protectAdmin, async (req, res) => {
       return res.status(404).json({ message: "Election not found" });
     }
     if (!name || !position) {
-     return res.status(400).json({ message: "Name and position required" });
+      return res.status(400).json({ message: "Name and position required" });
     }
 
     const candidate = await Candidate.create({
@@ -347,7 +303,10 @@ router.post("/elections/:id/candidates", protectAdmin, async (req, res) => {
     res.status(500).json({ message: "Error adding candidate" });
   }
 });
+
+// ==============================
 // 🏆 GET ELECTION RESULTS
+// ==============================
 router.get("/elections/:id/results", protectAdmin, async (req, res) => {
   try {
     const election = await Election.findById(req.params.id);
@@ -356,18 +315,14 @@ router.get("/elections/:id/results", protectAdmin, async (req, res) => {
       return res.status(404).json({ message: "Election not found" });
     }
 
-    // 🔍 Get all candidates for this election
     const candidates = await Candidate.find({
       election: election._id,
     }).select("name party position voteCount");
 
-    // 📊 Sort by votes (highest first)
     candidates.sort((a, b) => b.voteCount - a.voteCount);
 
-    const totalVotes = candidates.reduce(
-      (sum, c) => sum + c.voteCount,
-      0
-    );
+    const totalVotes = candidates.reduce((sum, c) => sum + c.voteCount, 0);
+    const totalStudents = await Student.countDocuments();
 
     return res.json({
       election: {
@@ -376,42 +331,7 @@ router.get("/elections/:id/results", protectAdmin, async (req, res) => {
         status: election.status,
       },
       totalVotes,
-      results: candidates,
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});// 🏆 GET ELECTION RESULTS
-router.get("/elections/:id/results", protectAdmin, async (req, res) => {
-  try {
-    const election = await Election.findById(req.params.id);
-
-    if (!election) {
-      return res.status(404).json({ message: "Election not found" });
-    }
-
-    // 🔍 Get all candidates for this election
-    const candidates = await Candidate.find({
-      election: election._id,
-    }).select("name party position voteCount");
-
-    // 📊 Sort by votes (highest first)
-    candidates.sort((a, b) => b.voteCount - a.voteCount);
-
-    const totalVotes = candidates.reduce(
-      (sum, c) => sum + c.voteCount,
-      0
-    );
-
-    return res.json({
-      election: {
-        id: election._id,
-        title: election.title,
-        status: election.status,
-      },
-      totalVotes,
+      totalStudents,
       results: candidates,
     });
 
@@ -420,7 +340,6 @@ router.get("/elections/:id/results", protectAdmin, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
 
 // ==============================
 // 📊 DASHBOARD STATS
@@ -443,7 +362,6 @@ router.get("/dashboard", protectAdmin, async (req, res) => {
   }
 });
 
-
 // ==============================
 // 📜 AUDIT LOGS
 // ==============================
@@ -455,19 +373,19 @@ router.get("/audit-logs", protectAdmin, async (req, res) => {
 
     res.json(logs);
   } catch (err) {
-    console.error("AUDIT LOG ERROR:",err)
-    res.status(500).json({ message: "Error fetching logs",
-      error: err.message
-     });
+    console.error("AUDIT LOG ERROR:", err);
+    res.status(500).json({ message: "Error fetching logs", error: err.message });
   }
 });
+
+// ==============================
+// 👤 ADMIN PROFILE
+// ==============================
 router.get("/profile", protectAdmin, async (req, res) => {
   try {
     const admin = req.admin;
-
     res.json({
       _id: admin._id,
-     
       role: admin.role
     });
   } catch (err) {
@@ -475,15 +393,5 @@ router.get("/profile", protectAdmin, async (req, res) => {
   }
 });
 
-
-
 module.exports = router;
-
-
-
-
-
-
-
-
 
