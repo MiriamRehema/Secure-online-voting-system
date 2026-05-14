@@ -393,5 +393,39 @@ router.get("/profile", protectAdmin, async (req, res) => {
   }
 });
 
+// ==============================
+// 🗑️ RESET ALL ELECTION DATA
+// ==============================
+router.delete("/reset", protectAdmin, async (req, res) => {
+  try {
+    if (req.admin.role !== "mainAdmin") {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    const Election = require("../models/Election");
+    const Candidate = require("../models/Candidate");
+    const Vote = require("../models/Vote");
+    const Token = require("../models/Token");
+
+    await Election.deleteMany({});
+    await Candidate.deleteMany({});
+    await Vote.deleteMany({});
+    await Token.deleteMany({});
+    await Student.updateMany({}, { hasVoted: false, votingToken: null });
+
+    logAudit("DATA_RESET", {
+      userId: req.admin._id,
+      userModel: "Admin",
+      ipAddress: req.ip,
+      status: "SUCCESS",
+    });
+
+    res.json({ message: "All data reset successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error resetting data" });
+  }
+});
+
 module.exports = router;
 
