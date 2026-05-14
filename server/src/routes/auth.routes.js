@@ -88,6 +88,7 @@ router.post("/student/login", async (req, res) => {
       studentId: student._id,
       fullName: student.fullName,
       regNumber: student.regNumber,
+      isFirstLogin: student.isFirstLogin,
     });
 
   } catch (err) {
@@ -156,6 +157,28 @@ router.post("/admin/login", async (req, res) => {
     
   );
 
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ==============================
+// 🔑 CHANGE PASSWORD
+// ==============================
+const protectStudent = require("../middlewares/protectStudent");
+
+router.post("/student/change-password", protectStudent, async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+    const student = req.student;
+    student.password = newPassword;
+    student.isFirstLogin = false;
+    await student.save();
+    return res.json({ message: "Password changed successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
