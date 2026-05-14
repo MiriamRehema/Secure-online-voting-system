@@ -307,7 +307,7 @@ router.post("/elections/:id/candidates", protectAdmin, async (req, res) => {
 // ==============================
 // 🏆 GET ELECTION RESULTS
 // ==============================
-router.get("/elections/:id/results", protectAdmin, async (req, res) => {
+router.get("/elections/:id/results", async (req, res) => {
   try {
     const election = await Election.findById(req.params.id);
 
