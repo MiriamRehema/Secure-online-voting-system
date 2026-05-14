@@ -12,7 +12,7 @@ const Election = require("../models/Election");
 const Student = require("../models/Student");
 const Candidate = require("../models/Candidate");
 
-const { encryptDescriptor } = require("../utils/crypto");
+const { encryptDescriptor, decryptDescriptor } = require("../utils/crypto");
 
 
 // ==============================
@@ -45,6 +45,30 @@ router.post("/students", protectAdmin, async (req, res) => {
     const existing = await Student.findOne({ regNumber });
     if (existing) {
       return res.status(400).json({ message: "Student already exists" });
+    }
+
+    // ==============================
+    // ✅ DUPLICATE FACE CHECK
+    // ==============================
+    const allStudents = await Student.find().select("fullName regNumber faceDescriptor");
+    const THRESHOLD = Number(process.env.FACE_THRESHOLD) || 0.45;
+
+    for (const s of allStudents) {
+      if (!s.faceDescriptor) continue;
+      try {
+        const storedDescriptor = JSON.parse(decryptDescriptor(s.faceDescriptor));
+        const distance = Math.sqrt(
+          faceDescriptor.reduce((sum, val, i) => sum + (val - storedDescriptor[i]) ** 2, 0)
+        );
+        if (distance < THRESHOLD) {
+          return res.status(400).json({
+            message: `This face is already registered to ${s.fullName} (${s.regNumber}). Each student must use their own face.`,
+          });
+        }
+      } catch (e) {
+        console.error("Face comparison error for student:", s._id, e);
+        continue;
+      }
     }
 
     const encryptedFace = encryptDescriptor(JSON.stringify(faceDescriptor));
@@ -325,17 +349,17 @@ router.get("/elections/:id/results", async (req, res) => {
     const totalStudents = await Student.countDocuments();
     const totalCompletedVoters = await Student.countDocuments({ hasVoted: true });
 
-   return res.json({
-     election: {
-      id: election._id,
-      title: election.title,
-      status: election.status,
-    },
-    totalVotes,
-    totalStudents,
-    totalCompletedVoters,
-    results: candidates,
-   });
+    return res.json({
+      election: {
+        id: election._id,
+        title: election.title,
+        status: election.status,
+      },
+      totalVotes,
+      totalStudents,
+      totalCompletedVoters,
+      results: candidates,
+    });
 
   } catch (err) {
     console.error(err);
@@ -430,4 +454,3 @@ router.delete("/reset", protectAdmin, async (req, res) => {
 });
 
 module.exports = router;
-
