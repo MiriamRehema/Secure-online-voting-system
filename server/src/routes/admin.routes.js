@@ -221,7 +221,7 @@ router.post("/elections", protectAdmin, async (req, res) => {
 // ==============================
 // 📝 GET ALL ELECTIONS
 // ==============================
-router.get("/elections", protectAdmin, async (req, res) => {
+router.get("/elections", async (req, res) => {
   try {
     const elections = await Election.find()
       .populate("candidates")
