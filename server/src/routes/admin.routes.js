@@ -349,7 +349,7 @@ router.get("/elections/:id/results", async (req, res) => {
 router.get("/dashboard", protectAdmin, async (req, res) => {
   try {
     const totalStudents = await Student.countDocuments();
-    const totalVotes = await Vote.countDocuments();
+    const totalVotes = await Student.countDocuments({ hasVoted: true });
     const totalElections = await Election.countDocuments();
     const activeElections = await Election.countDocuments({ status: "active" });
 
