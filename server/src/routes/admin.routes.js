@@ -323,17 +323,19 @@ router.get("/elections/:id/results", async (req, res) => {
 
     const totalVotes = candidates.reduce((sum, c) => sum + c.voteCount, 0);
     const totalStudents = await Student.countDocuments();
+    const totalCompletedVoters = await Student.countDocuments({ hasVoted: true });
 
-    return res.json({
-      election: {
-        id: election._id,
-        title: election.title,
-        status: election.status,
-      },
-      totalVotes,
-      totalStudents,
-      results: candidates,
-    });
+   return res.json({
+     election: {
+      id: election._id,
+      title: election.title,
+      status: election.status,
+    },
+    totalVotes,
+    totalStudents,
+    totalCompletedVoters,
+    results: candidates,
+   });
 
   } catch (err) {
     console.error(err);
