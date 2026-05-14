@@ -53,18 +53,13 @@ router.post("/verify-face", protectStudent, async (req, res) => {
     }
 
     // ==============================
-    // PREVENT DOUBLE VOTING
-    // ==============================
-    const alreadyVoted = await Vote.findOne({
-      student: student._id,
-      election: election._id,
-    });
-
-    if (alreadyVoted || student.hasVoted) {
-      return res.status(403).json({
-        message: "You have already voted",
-      });
-    }
+// PREVENT DOUBLE VOTING — only block if ALL positions voted
+// ==============================
+if (student.hasVoted) {
+  return res.status(403).json({
+    message: "You have already voted in all positions",
+  });
+}
 
     // ==============================
     // CHECK REGISTERED FACE
