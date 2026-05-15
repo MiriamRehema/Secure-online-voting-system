@@ -453,4 +453,73 @@ router.delete("/reset", protectAdmin, async (req, res) => {
   }
 });
 
+// ==============================
+// ✏️ UPDATE CANDIDATE
+// ==============================
+router.put("/elections/:electionId/candidates/:candidateId", protectAdmin, async (req, res) => {
+  try {
+    if (req.admin.role !== "mainAdmin") {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    const { name, position, party } = req.body;
+
+    const candidate = await Candidate.findById(req.params.candidateId);
+    if (!candidate) {
+      return res.status(404).json({ message: "Candidate not found" });
+    }
+
+    if (name) candidate.name = name;
+    if (position) candidate.position = position;
+    if (party !== undefined) candidate.party = party;
+
+    await candidate.save();
+
+    logAudit("CANDIDATE_UPDATE", {
+      userId: req.admin._id,
+      userModel: "Admin",
+      details: { candidateId: candidate._id },
+      ipAddress: req.ip,
+      status: "SUCCESS",
+    });
+
+    res.json({ message: "Candidate updated successfully", candidate });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating candidate" });
+  }
+});
+
+// ==============================
+// 🗑️ DELETE CANDIDATE
+// ==============================
+router.delete("/elections/:electionId/candidates/:candidateId", protectAdmin, async (req, res) => {
+  try {
+    if (req.admin.role !== "mainAdmin") {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    const candidate = await Candidate.findByIdAndDelete(req.params.candidateId);
+    if (!candidate) {
+      return res.status(404).json({ message: "Candidate not found" });
+    }
+
+    // remove from election's candidates array
+    await Election.findByIdAndUpdate(req.params.electionId, {
+      $pull: { candidates: candidate._id }
+    });
+
+    logAudit("CANDIDATE_DELETE", {
+      userId: req.admin._id,
+      userModel: "Admin",
+      details: { candidateId: candidate._id },
+      ipAddress: req.ip,
+      status: "SUCCESS",
+    });
+
+    res.json({ message: "Candidate deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error deleting candidate" });
+  }
+});
+
 module.exports = router;
