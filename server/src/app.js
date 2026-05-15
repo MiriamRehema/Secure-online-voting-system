@@ -2,19 +2,26 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 
-origin: [
-  "http://localhost:3000",
-  "https://jkuat-online-voting-sysstem.netlify.app",
-  "https://6a06d819caf9efe169a7a6a6--jkuat-online-voting-sysstem.netlify.app"
-],
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      "http://localhost:3000",
+      "https://jkuat-online-voting-sysstem.netlify.app"
+    ];
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith("--jkuat-online-voting-sysstem.netlify.app")) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
   optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-
 app.use(express.json());
 
 app.use((req, res, next) => {
