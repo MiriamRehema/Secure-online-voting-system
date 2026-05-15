@@ -2,10 +2,10 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 
-const corsOptions = {
-  origin: [
+origin: [
   "http://localhost:3000",
-  "https://jkuat-online-voting-sysstem.netlify.app/"
+  "https://jkuat-online-voting-sysstem.netlify.app",
+  "https://6a06d819caf9efe169a7a6a6--jkuat-online-voting-sysstem.netlify.app"
 ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
