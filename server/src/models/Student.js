@@ -53,6 +53,14 @@ const studentSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  resetPasswordToken: {
+  type: String,
+  default: null,
+},
+resetPasswordExpiry: {
+  type: Date,
+  default: null,
+},
 });
 studentSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
