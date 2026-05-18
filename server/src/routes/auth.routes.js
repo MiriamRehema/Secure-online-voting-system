@@ -3,22 +3,16 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 const Student = require("../models/Student");
 const Admin = require("../models/Admin");
 const logAudit = require("../utils/logAudit");
 
 // ==============================
-// 📧 NODEMAILER SETUP (created once, reused for all emails)
+// 📧 RESEND SETUP (created once, reused for all emails)
 // ==============================
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 
 // ==============================
@@ -230,29 +224,28 @@ router.post("/forgot-password", async (req, res) => {
     res.json({ message: "Reset link sent to your email" });
 
     // 📧 Send reset email (non-blocking)
-    transporter
-      .sendMail({
-        from: process.env.EMAIL_USER,
-        to: student.email,
-        subject: 'JKUAT Voting System - Password Reset',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
-            <h3>Password Reset Request</h3>
-            <p>Hello ${student.fullName},</p>
-            <p>You requested a password reset. Click the button below to reset your password:</p>
-            <a href="${resetLink}" style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
-              Reset Password
-            </a>
-            <p>This link expires in <strong>1 hour</strong>.</p>
-            <p>If you did not request this, please ignore this email.</p>
-            <hr/>
-            <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
-          </div>
-        `,
-      })
-      .then(() => console.log(`Reset email sent to ${student.email}`))
-      .catch((err) => console.error('Reset email failed:', err));
+    resend.emails.send({
+      from: 'JKUAT Voting <onboarding@resend.dev>',
+      to: student.email,
+      subject: 'JKUAT Voting System - Password Reset',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
+          <h3>Password Reset Request</h3>
+          <p>Hello ${student.fullName},</p>
+          <p>You requested a password reset. Click the button below to reset your password:</p>
+          <a href="${resetLink}" style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
+            Reset Password
+          </a>
+          <p>This link expires in <strong>1 hour</strong>.</p>
+          <p>If you did not request this, please ignore this email.</p>
+          <hr/>
+          <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
+        </div>
+      `,
+    })
+    .then(() => console.log(`Reset email sent to ${student.email}`))
+    .catch((err) => console.error('Reset email failed:', err));
 
   } catch (err) {
     console.error(err);
