@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+
 const adminSchema = new mongoose.Schema({
-  
   password: {
     type: String,
     required: true,
@@ -16,11 +16,24 @@ const adminSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  otp: {
+    type: String,
+    default: null,
+  },
+  otpExpiry: {
+    type: Date,
+    default: null,
+  },
 });
+
 // 🔐 AUTO HASH PASSWORD
 adminSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
-
   this.password = await bcrypt.hash(this.password, 10);
 });
 
