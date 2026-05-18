@@ -93,6 +93,49 @@ router.post("/students", protectAdmin, async (req, res) => {
       status: "SUCCESS",
     });
 
+    // ==============================
+    // 📧 SEND WELCOME EMAIL
+    // ==============================
+    try {
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        }
+      });
+
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: student.email,
+        subject: 'JKUAT Voting System - Account Created',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
+            <h3>Welcome, ${student.fullName}!</h3>
+            <p>Your student voting account has been created successfully.</p>
+            <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Registration Number:</strong> ${student.regNumber}</p>
+              <p><strong>Temporary Password:</strong> ${password}</p>
+            </div>
+            <p>Please login and change your password immediately after your first login.</p>
+            <a href="https://jkuat-online-voting-sysstem.netlify.app/student-login"
+               style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
+              Login Now
+            </a>
+            <hr/>
+            <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
+          </div>
+        `
+      });
+
+      console.log(`Welcome email sent to ${student.email}`);
+    } catch (emailErr) {
+      console.error('Welcome email failed:', emailErr);
+      // Don't fail registration if email fails
+    }
+
     res.status(201).json({ message: "Student registered successfully" });
 
   } catch (err) {
@@ -282,6 +325,53 @@ router.put("/elections/:id/status", protectAdmin, async (req, res) => {
       ipAddress: req.ip,
       status: "SUCCESS",
     });
+
+    // ==============================
+    // 📧 NOTIFY ALL STUDENTS WHEN ELECTION STARTS
+    // ==============================
+    if (status === 'active') {
+      try {
+        const nodemailer = require('nodemailer');
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+          }
+        });
+
+        const allStudents = await Student.find().select('email fullName');
+
+        for (const student of allStudents) {
+          if (!student.email) continue;
+          await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: student.email,
+            subject: 'JKUAT Voting System - Voting is Now Open!',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
+                <h3>Voting is Now Open!</h3>
+                <p>Hello ${student.fullName},</p>
+                <p>The JKUSA election <strong>${election.title}</strong> is now open for voting.</p>
+                <p>Login now to cast your vote. Every vote counts!</p>
+                <a href="https://jkuat-online-voting-sysstem.netlify.app/student-login"
+                   style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
+                  Vote Now
+                </a>
+                <hr/>
+                <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
+              </div>
+            `
+          });
+        }
+
+        console.log(`Election start emails sent to ${allStudents.length} students`);
+      } catch (emailErr) {
+        console.error('Election notification email failed:', emailErr);
+        // Don't fail status update if email fails
+      }
+    }
 
     res.json(election);
   } catch (err) {
