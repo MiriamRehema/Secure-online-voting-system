@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
+const { Resend } = require('resend');
 const logAudit = require("../utils/logAudit");
 const AuditLog = require("../models/AuditLog");
 const Vote = require("../models/Vote");
@@ -16,15 +16,9 @@ const Candidate = require("../models/Candidate");
 const { encryptDescriptor, decryptDescriptor } = require("../utils/crypto");
 
 // ==============================
-// 📧 NODEMAILER SETUP (created once, reused for all emails)
+// 📧 RESEND SETUP (created once, reused for all emails)
 // ==============================
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 
 // ==============================
@@ -113,32 +107,31 @@ router.post("/students", protectAdmin, async (req, res) => {
     // ==============================
     // 📧 WELCOME EMAIL (non-blocking — fires after response)
     // ==============================
-    transporter
-      .sendMail({
-        from: process.env.EMAIL_USER,
-        to: student.email,
-        subject: "JKUAT Voting System - Account Created",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
-            <h3>Welcome, ${student.fullName}!</h3>
-            <p>Your student voting account has been created successfully.</p>
-            <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 20px 0;">
-              <p><strong>Registration Number:</strong> ${student.regNumber}</p>
-              <p><strong>Temporary Password:</strong> ${password}</p>
-            </div>
-            <p>Please login and change your password immediately after your first login.</p>
-            <a href="https://jkuat-online-voting-sysstem.netlify.app/student-login"
-               style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
-              Login Now
-            </a>
-            <hr/>
-            <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
+    resend.emails.send({
+      from: 'JKUAT Voting <onboarding@resend.dev>',
+      to: student.email,
+      subject: 'JKUAT Voting System - Account Created',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
+          <h3>Welcome, ${student.fullName}!</h3>
+          <p>Your student voting account has been created successfully.</p>
+          <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Registration Number:</strong> ${student.regNumber}</p>
+            <p><strong>Temporary Password:</strong> ${password}</p>
           </div>
-        `,
-      })
-      .then(() => console.log(`Welcome email sent to ${student.email}`))
-      .catch((err) => console.error("Welcome email failed:", err));
+          <p>Please login and change your password immediately after your first login.</p>
+          <a href="https://jkuat-online-voting-sysstem.netlify.app/student-login"
+             style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
+            Login Now
+          </a>
+          <hr/>
+          <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
+        </div>
+      `,
+    })
+    .then(() => console.log(`Welcome email sent to ${student.email}`))
+    .catch((err) => console.error('Welcome email failed:', err));
 
   } catch (err) {
     console.error(err);
@@ -329,9 +322,7 @@ router.put("/elections/:id/status", protectAdmin, async (req, res) => {
       status: "SUCCESS",
     });
 
-    // ==============================
     // ✅ RESPOND IMMEDIATELY — emails send in background
-    // ==============================
     res.json(election);
 
     // ==============================
@@ -344,30 +335,27 @@ router.put("/elections/:id/status", protectAdmin, async (req, res) => {
           const emailPromises = allStudents
             .filter((s) => s.email)
             .map((student) =>
-              transporter
-                .sendMail({
-                  from: process.env.EMAIL_USER,
-                  to: student.email,
-                  subject: "JKUAT Voting System - Voting is Now Open!",
-                  html: `
-                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                      <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
-                      <h3>Voting is Now Open!</h3>
-                      <p>Hello ${student.fullName},</p>
-                      <p>The JKUSA election <strong>${election.title}</strong> is now open for voting.</p>
-                      <p>Login now to cast your vote. Every vote counts!</p>
-                      <a href="https://jkuat-online-voting-sysstem.netlify.app/student-login"
-                         style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
-                        Vote Now
-                      </a>
-                      <hr/>
-                      <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
-                    </div>
-                  `,
-                })
-                .catch((err) =>
-                  console.error(`Email failed for ${student.email}:`, err)
-                )
+              resend.emails.send({
+                from: 'JKUAT Voting <onboarding@resend.dev>',
+                to: student.email,
+                subject: 'JKUAT Voting System - Voting is Now Open!',
+                html: `
+                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
+                    <h3>Voting is Now Open!</h3>
+                    <p>Hello ${student.fullName},</p>
+                    <p>The JKUSA election <strong>${election.title}</strong> is now open for voting.</p>
+                    <p>Login now to cast your vote. Every vote counts!</p>
+                    <a href="https://jkuat-online-voting-sysstem.netlify.app/student-login"
+                       style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
+                      Vote Now
+                    </a>
+                    <hr/>
+                    <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
+                  </div>
+                `,
+              })
+              .catch((err) => console.error(`Email failed for ${student.email}:`, err))
             );
 
           Promise.all(emailPromises).then(() =>
