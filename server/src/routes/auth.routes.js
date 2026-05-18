@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
 const Student = require("../models/Student");
@@ -46,14 +45,9 @@ router.post("/student/login", async (req, res) => {
     const isMatch = await bcrypt.compare(password, student.password);
     console.log("INPUT PASSWORD:", password);
       console.log("DB HASH:", student.password);
-     //console.log("MATCH RESULT:", await bcrypt.compare(password, student.password));
-     
      
      const test = await bcrypt.compare(password, student.password);
       console.log("BCRYPT DIRECT TEST:", test);
-     // console.log(bcrypt.compareSync("Password@123", "$2b$10$GDpuUGhJHBpkS/LwjlUpa.GTDDiwslF1Frv.u1jBMffH.P0W2CEMq")
-
-
 
     if (!isMatch) {
       await logAudit("STUDENT_LOGIN_FAIL", {
@@ -155,9 +149,7 @@ router.post("/admin/login", async (req, res) => {
       role: admin.role,
       adminId: admin._id,
       redirect: "/admin/dashboard"
-    }
-    
-  );
+    });
 
   } catch (err) {
     console.error(err);
@@ -214,6 +206,8 @@ router.post("/forgot-password", async (req, res) => {
 
     const resetLink = `https://jkuat-online-voting-sysstem.netlify.app/reset-password/${resetToken}`;
 
+    // ✅ nodemailer loaded here (not at top) so server starts even if module has issues
+    const nodemailer = require('nodemailer');
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
