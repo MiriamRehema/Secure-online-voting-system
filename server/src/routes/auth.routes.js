@@ -3,14 +3,26 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 const Student = require("../models/Student");
 const Admin = require("../models/Admin");
 const logAudit = require("../utils/logAudit");
 
+// ==============================
+// 📧 NODEMAILER SETUP (created once, reused for all emails)
+// ==============================
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
 
 // ==============================
-// 👨‍🎓 STUDENT LOGIN (FIXED)
+// 👨‍🎓 STUDENT LOGIN
 // ==============================
 router.post("/student/login", async (req, res) => {
   try {
@@ -21,14 +33,13 @@ router.post("/student/login", async (req, res) => {
         message: "Missing credentials",
       });
     }
-   
-    
 
-    // ✅ NORMALIZATION (VERY IMPORTANT)
     regNumber = regNumber.trim().toLowerCase();
-     console.log("LOGIN REGNUMBER:", regNumber);
+    console.log("LOGIN REGNUMBER:", regNumber);
+
     const student = await Student.findOne({ regNumber });
     console.log("STUDENT FOUND:", student);
+
     if (!student) {
       await logAudit("STUDENT_LOGIN_FAIL", {
         details: { regNumber },
@@ -41,13 +52,12 @@ router.post("/student/login", async (req, res) => {
       });
     }
 
-    // 🔐 CHECK PASSWORD
     const isMatch = await bcrypt.compare(password, student.password);
     console.log("INPUT PASSWORD:", password);
-      console.log("DB HASH:", student.password);
-     
-     const test = await bcrypt.compare(password, student.password);
-      console.log("BCRYPT DIRECT TEST:", test);
+    console.log("DB HASH:", student.password);
+
+    const test = await bcrypt.compare(password, student.password);
+    console.log("BCRYPT DIRECT TEST:", test);
 
     if (!isMatch) {
       await logAudit("STUDENT_LOGIN_FAIL", {
@@ -62,7 +72,6 @@ router.post("/student/login", async (req, res) => {
       });
     }
 
-    // 🔑 GENERATE TOKEN
     const token = jwt.sign(
       {
         id: student._id,
@@ -118,7 +127,6 @@ router.post("/admin/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // ✅ USE MODEL METHOD
     const isMatch = await admin.matchPassword(password);
 
     if (!isMatch) {
@@ -148,7 +156,7 @@ router.post("/admin/login", async (req, res) => {
       token,
       role: admin.role,
       adminId: admin._id,
-      redirect: "/admin/dashboard"
+      redirect: "/admin/dashboard",
     });
 
   } catch (err) {
@@ -156,6 +164,7 @@ router.post("/admin/login", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 // ==============================
 // 🔑 CHANGE PASSWORD
@@ -165,19 +174,23 @@ const protectStudent = require("../middlewares/protectStudent");
 router.post("/student/change-password", protectStudent, async (req, res) => {
   try {
     const { newPassword } = req.body;
+
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
+
     const student = req.student;
     student.password = newPassword;
     student.isFirstLogin = false;
     await student.save();
+
     return res.json({ message: "Password changed successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 // ==============================
 // 🔑 FORGOT PASSWORD
@@ -190,9 +203,9 @@ router.post("/forgot-password", async (req, res) => {
       return res.status(400).json({ message: "Please provide reg number and email" });
     }
 
-    const student = await Student.findOne({ 
-      regNumber: regNumber.trim().toLowerCase(), 
-      email: email.trim().toLowerCase() 
+    const student = await Student.findOne({
+      regNumber: regNumber.trim().toLowerCase(),
+      email: email.trim().toLowerCase(),
     });
 
     if (!student) {
@@ -201,41 +214,10 @@ router.post("/forgot-password", async (req, res) => {
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     student.resetPasswordToken = resetToken;
-    student.resetPasswordExpiry = Date.now() + 3600000;
+    student.resetPasswordExpiry = Date.now() + 3600000; // 1 hour
     await student.save();
 
     const resetLink = `https://jkuat-online-voting-sysstem.netlify.app/reset-password/${resetToken}`;
-
-    // ✅ nodemailer loaded here (not at top) so server starts even if module has issues
-    const nodemailer = require('nodemailer');
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: student.email,
-      subject: 'JKUAT Voting System - Password Reset',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
-          <h3>Password Reset Request</h3>
-          <p>Hello ${student.fullName},</p>
-          <p>You requested a password reset. Click the button below to reset your password:</p>
-          <a href="${resetLink}" style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
-            Reset Password
-          </a>
-          <p>This link expires in <strong>1 hour</strong>.</p>
-          <p>If you did not request this, please ignore this email.</p>
-          <hr/>
-          <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
-        </div>
-      `
-    });
 
     await logAudit("FORGOT_PASSWORD_REQUEST", {
       userId: student._id,
@@ -244,13 +226,40 @@ router.post("/forgot-password", async (req, res) => {
       status: "SUCCESS",
     });
 
+    // ✅ Respond immediately — email sends in background
     res.json({ message: "Reset link sent to your email" });
+
+    // 📧 Send reset email (non-blocking)
+    transporter
+      .sendMail({
+        from: process.env.EMAIL_USER,
+        to: student.email,
+        subject: 'JKUAT Voting System - Password Reset',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
+            <h3>Password Reset Request</h3>
+            <p>Hello ${student.fullName},</p>
+            <p>You requested a password reset. Click the button below to reset your password:</p>
+            <a href="${resetLink}" style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
+              Reset Password
+            </a>
+            <p>This link expires in <strong>1 hour</strong>.</p>
+            <p>If you did not request this, please ignore this email.</p>
+            <hr/>
+            <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
+          </div>
+        `,
+      })
+      .then(() => console.log(`Reset email sent to ${student.email}`))
+      .catch((err) => console.error('Reset email failed:', err));
 
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 // ==============================
 // 🔑 RESET PASSWORD
@@ -270,7 +279,7 @@ router.post("/reset-password/:token", async (req, res) => {
 
     const student = await Student.findOne({
       resetPasswordToken: token,
-      resetPasswordExpiry: { $gt: Date.now() }
+      resetPasswordExpiry: { $gt: Date.now() },
     });
 
     if (!student) {
