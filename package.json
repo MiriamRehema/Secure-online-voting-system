@@ -5,4 +5,3 @@
     "install": "cd server && npm install"
   }
 }
-EOF 
