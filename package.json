@@ -1,7 +1,0 @@
-{
-  "name": "jkuat-voting-system",
-  "scripts": {
-    "start": "cd server && node server.js",
-    "install": "cd server && npm install"
-  }
-}
