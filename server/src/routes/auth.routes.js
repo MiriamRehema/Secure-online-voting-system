@@ -10,7 +10,7 @@ const Admin = require("../models/Admin");
 const logAudit = require("../utils/logAudit");
 
 // ==============================
-// 📧 RESEND SETUP (created once, reused for all emails)
+// 📧 RESEND SETUP
 // ==============================
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -23,16 +23,12 @@ router.post("/student/login", async (req, res) => {
     let { regNumber, password } = req.body;
 
     if (!regNumber || !password) {
-      return res.status(400).json({
-        message: "Missing credentials",
-      });
+      return res.status(400).json({ message: "Missing credentials" });
     }
 
     regNumber = regNumber.trim().toLowerCase();
-    console.log("LOGIN REGNUMBER:", regNumber);
 
     const student = await Student.findOne({ regNumber });
-    console.log("STUDENT FOUND:", student);
 
     if (!student) {
       await logAudit("STUDENT_LOGIN_FAIL", {
@@ -40,18 +36,10 @@ router.post("/student/login", async (req, res) => {
         ipAddress: req.ip,
         status: "FAILURE",
       });
-
-      return res.status(401).json({
-        message: "Invalid credentials",
-      });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const isMatch = await bcrypt.compare(password, student.password);
-    console.log("INPUT PASSWORD:", password);
-    console.log("DB HASH:", student.password);
-
-    const test = await bcrypt.compare(password, student.password);
-    console.log("BCRYPT DIRECT TEST:", test);
 
     if (!isMatch) {
       await logAudit("STUDENT_LOGIN_FAIL", {
@@ -60,17 +48,11 @@ router.post("/student/login", async (req, res) => {
         ipAddress: req.ip,
         status: "FAILURE",
       });
-
-      return res.status(401).json({
-        message: "Invalid credentials",
-      });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const token = jwt.sign(
-      {
-        id: student._id,
-        role: "student",
-      },
+      { id: student._id, role: "student" },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
@@ -92,15 +74,13 @@ router.post("/student/login", async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({
-      message: "Server error",
-    });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
 
 // ==============================
-// 👨‍💼 ADMIN LOGIN
+// 👨‍💼 ADMIN LOGIN — STEP 1 (password check → send OTP)
 // ==============================
 router.post("/admin/login", async (req, res) => {
   try {
@@ -132,6 +112,76 @@ router.post("/admin/login", async (req, res) => {
       });
       return res.status(401).json({ message: "Invalid credentials" });
     }
+
+    // ✅ Password correct — generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+    admin.otp = otp;
+    admin.otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // expires in 5 minutes
+    await admin.save();
+
+    // ✅ Respond immediately
+    res.json({ message: "OTP sent to your email", otpSent: true, adminId: admin._id });
+
+    // 📧 Send OTP email (non-blocking)
+    resend.emails.send({
+      from: 'JKUAT Voting <onboarding@resend.dev>',
+      to: admin.email,
+      subject: 'JKUAT Voting System - Your Login OTP',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
+          <h3>Admin Login - One Time Password</h3>
+          <p>Your OTP for admin login is:</p>
+          <div style="background: #f5f5f5; padding: 24px; border-radius: 8px; text-align: center; margin: 20px 0;">
+            <h1 style="color: #2e7d32; letter-spacing: 8px; font-size: 48px; margin: 0;">${otp}</h1>
+          </div>
+          <p>This OTP expires in <strong>5 minutes</strong>.</p>
+          <p>If you did not attempt to login, please contact the system administrator immediately.</p>
+          <hr/>
+          <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
+        </div>
+      `,
+    })
+    .then(() => console.log(`OTP email sent to ${admin.email}`))
+    .catch((err) => console.error('OTP email failed:', err));
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+// ==============================
+// 👨‍💼 ADMIN LOGIN — STEP 2 (verify OTP → issue token)
+// ==============================
+router.post("/admin/verify-otp", async (req, res) => {
+  try {
+    const { adminId, otp } = req.body;
+
+    if (!adminId || !otp) {
+      return res.status(400).json({ message: "Missing OTP or admin ID" });
+    }
+
+    const admin = await Admin.findById(adminId);
+
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    // Check OTP matches and hasn't expired
+    if (admin.otp !== otp) {
+      return res.status(401).json({ message: "Invalid OTP" });
+    }
+
+    if (!admin.otpExpiry || admin.otpExpiry < new Date()) {
+      return res.status(401).json({ message: "OTP has expired, please login again" });
+    }
+
+    // ✅ OTP valid — clear it and issue JWT
+    admin.otp = null;
+    admin.otpExpiry = null;
+    await admin.save();
 
     const token = jwt.sign(
       { id: admin._id, role: admin.role },
@@ -208,7 +258,7 @@ router.post("/forgot-password", async (req, res) => {
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     student.resetPasswordToken = resetToken;
-    student.resetPasswordExpiry = Date.now() + 3600000; // 1 hour
+    student.resetPasswordExpiry = Date.now() + 3600000;
     await student.save();
 
     const resetLink = `https://jkuat-online-voting-sysstem.netlify.app/reset-password/${resetToken}`;
@@ -220,10 +270,8 @@ router.post("/forgot-password", async (req, res) => {
       status: "SUCCESS",
     });
 
-    // ✅ Respond immediately — email sends in background
     res.json({ message: "Reset link sent to your email" });
 
-    // 📧 Send reset email (non-blocking)
     resend.emails.send({
       from: 'JKUAT Voting <onboarding@resend.dev>',
       to: student.email,
