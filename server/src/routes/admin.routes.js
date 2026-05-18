@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
 const logAudit = require("../utils/logAudit");
 const AuditLog = require("../models/AuditLog");
 const Vote = require("../models/Vote");
@@ -13,6 +14,17 @@ const Student = require("../models/Student");
 const Candidate = require("../models/Candidate");
 
 const { encryptDescriptor, decryptDescriptor } = require("../utils/crypto");
+
+// ==============================
+// 📧 NODEMAILER SETUP (created once, reused for all emails)
+// ==============================
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 
 // ==============================
@@ -48,7 +60,7 @@ router.post("/students", protectAdmin, async (req, res) => {
     }
 
     // ==============================
-    // ✅ DUPLICATE FACE CHECK
+    // ✅ DUPLICATE FACE CHECK (server-side)
     // ==============================
     const allStudents = await Student.find().select("fullName regNumber faceDescriptor");
     const THRESHOLD = Number(process.env.FACE_THRESHOLD) || 0.45;
@@ -94,22 +106,18 @@ router.post("/students", protectAdmin, async (req, res) => {
     });
 
     // ==============================
-    // 📧 SEND WELCOME EMAIL
+    // ✅ RESPOND IMMEDIATELY — email sends in background
     // ==============================
-    try {
-      const nodemailer = require('nodemailer');
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
-        }
-      });
+    res.status(201).json({ message: "Student registered successfully" });
 
-      await transporter.sendMail({
+    // ==============================
+    // 📧 WELCOME EMAIL (non-blocking — fires after response)
+    // ==============================
+    transporter
+      .sendMail({
         from: process.env.EMAIL_USER,
         to: student.email,
-        subject: 'JKUAT Voting System - Account Created',
+        subject: "JKUAT Voting System - Account Created",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
@@ -127,16 +135,10 @@ router.post("/students", protectAdmin, async (req, res) => {
             <hr/>
             <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
           </div>
-        `
-      });
-
-      console.log(`Welcome email sent to ${student.email}`);
-    } catch (emailErr) {
-      console.error('Welcome email failed:', emailErr);
-      // Don't fail registration if email fails
-    }
-
-    res.status(201).json({ message: "Student registered successfully" });
+        `,
+      })
+      .then(() => console.log(`Welcome email sent to ${student.email}`))
+      .catch((err) => console.error("Welcome email failed:", err));
 
   } catch (err) {
     console.error(err);
@@ -167,8 +169,9 @@ router.get("/students/:id", protectAdmin, async (req, res) => {
     return res.status(403).json({ message: "Not allowed" });
   }
   try {
-    const student = await Student.findById(req.params.id)
-      .select("-password -faceDescriptor");
+    const student = await Student.findById(req.params.id).select(
+      "-password -faceDescriptor"
+    );
 
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
@@ -327,53 +330,53 @@ router.put("/elections/:id/status", protectAdmin, async (req, res) => {
     });
 
     // ==============================
-    // 📧 NOTIFY ALL STUDENTS WHEN ELECTION STARTS
+    // ✅ RESPOND IMMEDIATELY — emails send in background
     // ==============================
-    if (status === 'active') {
-      try {
-        const nodemailer = require('nodemailer');
-        const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-          }
-        });
+    res.json(election);
 
-        const allStudents = await Student.find().select('email fullName');
+    // ==============================
+    // 📧 NOTIFY ALL STUDENTS WHEN ELECTION STARTS (non-blocking)
+    // ==============================
+    if (status === "active") {
+      Student.find()
+        .select("email fullName")
+        .then((allStudents) => {
+          const emailPromises = allStudents
+            .filter((s) => s.email)
+            .map((student) =>
+              transporter
+                .sendMail({
+                  from: process.env.EMAIL_USER,
+                  to: student.email,
+                  subject: "JKUAT Voting System - Voting is Now Open!",
+                  html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                      <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
+                      <h3>Voting is Now Open!</h3>
+                      <p>Hello ${student.fullName},</p>
+                      <p>The JKUSA election <strong>${election.title}</strong> is now open for voting.</p>
+                      <p>Login now to cast your vote. Every vote counts!</p>
+                      <a href="https://jkuat-online-voting-sysstem.netlify.app/student-login"
+                         style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
+                        Vote Now
+                      </a>
+                      <hr/>
+                      <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
+                    </div>
+                  `,
+                })
+                .catch((err) =>
+                  console.error(`Email failed for ${student.email}:`, err)
+                )
+            );
 
-        for (const student of allStudents) {
-          if (!student.email) continue;
-          await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: student.email,
-            subject: 'JKUAT Voting System - Voting is Now Open!',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
-                <h3>Voting is Now Open!</h3>
-                <p>Hello ${student.fullName},</p>
-                <p>The JKUSA election <strong>${election.title}</strong> is now open for voting.</p>
-                <p>Login now to cast your vote. Every vote counts!</p>
-                <a href="https://jkuat-online-voting-sysstem.netlify.app/student-login"
-                   style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
-                  Vote Now
-                </a>
-                <hr/>
-                <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
-              </div>
-            `
-          });
-        }
-
-        console.log(`Election start emails sent to ${allStudents.length} students`);
-      } catch (emailErr) {
-        console.error('Election notification email failed:', emailErr);
-        // Don't fail status update if email fails
-      }
+          Promise.all(emailPromises).then(() =>
+            console.log(`Election start emails sent to ${allStudents.length} students`)
+          );
+        })
+        .catch((err) => console.error("Failed to fetch students for email:", err));
     }
 
-    res.json(election);
   } catch (err) {
     res.status(500).json({ message: "Error updating election", error: err.message });
   }
@@ -483,9 +486,7 @@ router.get("/dashboard", protectAdmin, async (req, res) => {
 // ==============================
 router.get("/audit-logs", protectAdmin, async (req, res) => {
   try {
-    const logs = await AuditLog.find()
-      .sort({ timestamp: -1 })
-      .limit(50);
+    const logs = await AuditLog.find().sort({ timestamp: -1 }).limit(50);
 
     res.json(logs);
   } catch (err) {
@@ -502,7 +503,7 @@ router.get("/profile", protectAdmin, async (req, res) => {
     const admin = req.admin;
     res.json({
       _id: admin._id,
-      role: admin.role
+      role: admin.role,
     });
   } catch (err) {
     res.status(500).json({ message: "Error fetching admin profile" });
@@ -593,9 +594,8 @@ router.delete("/elections/:electionId/candidates/:candidateId", protectAdmin, as
       return res.status(404).json({ message: "Candidate not found" });
     }
 
-    // remove from election's candidates array
     await Election.findByIdAndUpdate(req.params.electionId, {
-      $pull: { candidates: candidate._id }
+      $pull: { candidates: candidate._id },
     });
 
     logAudit("CANDIDATE_DELETE", {
