@@ -125,7 +125,7 @@ router.post("/admin/login", async (req, res) => {
     // 📧 Send OTP email (non-blocking)
     resend.emails.send({
       from: 'JKUAT Voting <onboarding@resend.dev>',
-      to: admin.email,
+      to: process.env.ADMIN_EMAIL,
       subject: 'JKUAT Voting System - Your Login OTP',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
