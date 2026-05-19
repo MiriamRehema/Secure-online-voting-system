@@ -6,6 +6,7 @@ const { Resend } = require('resend');
 const logAudit = require("../utils/logAudit");
 const AuditLog = require("../models/AuditLog");
 const Vote = require("../models/Vote");
+const Admin = require("../models/Admin");
 
 const protectAdmin = require("../middlewares/authMiddleware");
 
@@ -20,6 +21,72 @@ const { encryptDescriptor, decryptDescriptor } = require("../utils/crypto");
 // ==============================
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// ==============================
+// 👨‍💼 CREATE ADMIN ACCOUNT (mainAdmin only)
+// ==============================
+router.post("/create-admin", protectAdmin, async (req, res) => {
+  if (req.admin.role !== "mainAdmin") {
+    return res.status(403).json({ message: "Only main admin can create admin accounts" });
+  }
+
+  try {
+    const { regNumber, email, password, role } = req.body;
+
+    if (!regNumber || !email || !password || !role) {
+      return res.status(400).json({ message: "All fields required" });
+    }
+
+    const existing = await Admin.findOne({ regNumber });
+    if (existing) {
+      return res.status(400).json({ message: "Admin with this reg number already exists" });
+    }
+
+    const admin = new Admin({ regNumber, email, password, role });
+    await admin.save();
+
+    logAudit("ADMIN_CREATE", {
+      userId: req.admin._id,
+      userModel: "Admin",
+      details: { newAdminId: admin._id, role },
+      ipAddress: req.ip,
+      status: "SUCCESS",
+    });
+
+    res.status(201).json({ message: "Admin account created successfully" });
+
+    // 📧 Send welcome email (non-blocking)
+    resend.emails.send({
+      from: 'JKUAT Voting <onboarding@resend.dev>',
+      to: email,
+      subject: 'JKUAT Voting System - Admin Account Created',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2e7d32;">JKUAT Secure Voting System</h2>
+          <h3>Admin Account Created</h3>
+          <p>An admin account has been created for you.</p>
+          <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Admin ID:</strong> ${regNumber}</p>
+            <p><strong>Temporary Password:</strong> ${password}</p>
+            <p><strong>Role:</strong> ${role}</p>
+          </div>
+          <p>Please login and keep your credentials secure.</p>
+          <a href="https://jkuat-online-voting-sysstem.netlify.app/admin-login"
+             style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
+            Login Now
+          </a>
+          <hr/>
+          <p style="color: #888; font-size: 12px;">JKUAT Secure Voting System - JKUSA Elections</p>
+        </div>
+      `,
+    })
+    .then(() => console.log(`Welcome email sent to ${email}`))
+    .catch((err) => console.error('Welcome email failed:', err));
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 // ==============================
 // 👨‍🎓 CREATE STUDENT
